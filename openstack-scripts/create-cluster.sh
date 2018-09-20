@@ -23,8 +23,15 @@ KEY_NAME=""
 WINDOWS_FLAVOR=""
 LINUX_FLAVOR=""
 
-NETWORK_PRIVATE=""
-NETWORK_PUBLIC=""
+WINDOWS_IMAGE=""
+LINUX_IMAGE=""
+
+NETWORK_INTERNAL=""
+NETWORK_EXTERNAL=""
+
+ANSIBLE_MASTER=""
+ANSIBLE_SERVER=""
+ANSIBLE_USER_DATA=""
 
 function read-config() {
     local config="$1"
@@ -47,6 +54,9 @@ function read-config() {
     NETWORK_INTERNAL=$(crudini --get $config network internal)
     NETWORK_EXTERNAL=$(crudini --get $config network external)
 
+    ANSIBLE_SERVER=$(crudini --get $config ansible server-name)
+    ANSIBLE_USER_DATA=$(crudini --get $config ansible user-data)
+
     echo "CONFIG IS:"
     echo "----------------------------------------------"
     echo "Windows nodes are:        $WINDOWS_NODES"
@@ -64,37 +74,60 @@ function read-config() {
     echo "----------------------------------------------"
 }
 
+function delete-instance () {
+    local server="$1"
+
+    echo "Now deleting : $server"
+    ip=$(openstack server show $server | grep address | awk '{print $5}')
+    openstack server delete "$server"
+    openstack floating ip delete $ip
+}
+
 function delete-previous-cluster () {
     IFS=","
     for server in $WINDOWS_NODES; do
-        echo "Now deleting : $server"
-        ip=$(openstack server show $server | grep address | awk '{print $5}')
-        openstack server delete "$server"
-        openstack floating ip delete $ip
+        delete-instance $server
     done
     for server in $LINUX_NODES; do
-        echo "Now deleting : $server"
-        ip=$(openstack server show $server | grep address | awk '{print $5}')
-        openstack server delete "$server"
-        openstack floating ip delete $ip
+        delete-instance $server
     done
+    delete-instance $ANSIBLE_SERVER
     IFS=$" "
+}
+
+function boot-instance () {
+    local server="$1";   shift
+    local platform="$1"; shift
+    local custom_platform_flavor="$1"
+
+    local flavor=$(eval echo "\$${platform}_FLAVOR")
+    local image=$(eval echo "\$${platform}_IMAGE")
+    local user_data=$(eval echo "\$${platform}_USER_DATA")
+
+    echo "Now booting : $server"
+    nova boot --flavor $flavor --image $image --nic net-id=$NETWORK_INTERNAL --key $KEY_NAME --user-data $user_data $server > /dev/null
+    ip=$(openstack floating ip create $NETWORK_EXTERNAL | grep " name " | awk '{print $4}')
+    openstack server add floating ip $server $ip
+}
+
+function boot-ansible () {
+    if [[ $ANSIBLE_MASTER == "true" ]]; then
+        echo "Booting Ansible master instance"
+        nova boot --flavor $WINDOWS_FLAVOR --image $LINUX_IMAGE --nic net-id=$NETWORK_INTERNAL --key $KEY_NAME --user-data $ANSIBLE_USER_DATA $ANSIBLE_SERVER > /dev/null
+        ip=$(openstack floating ip create $NETWORK_EXTERNAL | grep " name " | awk '{print $4}')
+        openstack server add floating ip $ANSIBLE_SERVER $ip
+    fi
 }
 
 function create-cluster () {
     IFS=","
     for server in $WINDOWS_NODES; do
-        echo "Now booting : $server"
-        nova boot --flavor $WINDOWS_FLAVOR --image $WINDOWS_IMAGE --nic net-id=$NETWORK_INTERNAL --key $KEY_NAME --user-data $WINDOWS_USER_DATA $server > /dev/null
-        ip=$(openstack floating ip create $NETWORK_EXTERNAL | grep " name " | awk '{print $4}')
-        openstack server add floating ip $server $ip
+        boot-instance $server "WINDOWS"
     done
     for server in $LINUX_NODES; do
-        echo "Now booting : $server"
-        nova boot --flavor $LINUX_FLAVOR --image $LINUX_IMAGE --nic net-id=$NETWORK_INTERNAL --key $KEY_NAME --user-data $LINUX_USER_DATA $server > /dev/null
-        ip=$(openstack floating ip create $NETWORK_EXTERNAL | grep " name " | awk '{print $4}')
-        openstack server add floating ip $server $ip
+        boot-instance $server "LINUX"
     done
+    boot-ansible
     IFS=$" "
 }
 
@@ -118,8 +151,7 @@ function generate-report () {
 }
 
 function main() {
-	
-    TEMP=$(getopt -o c:x::d:: --long config:,clean::,down:: -n '' -- "$@")
+    TEMP=$(getopt -o c:x::d::a:: --long config:,clean::,down::,ansible:: -n '' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -130,22 +162,24 @@ function main() {
     while true ; do
         case "$1" in
             --config)
-                CONFIG="$2";  shift 2;;
+                CONFIG="$2";           shift 2;;
             --clean)
-                CLEAN="true"; shift 2;;
+                CLEAN="true";          shift 2;;
             --down)
-                DOWN="true";  shift 2;;
+                DOWN="true";           shift 2;;
+            --ansible)
+                ANSIBLE_MASTER="true"; shift 2;;
             --) shift ; break ;;
         esac
     done
 
     read-config "$CONFIG"
-    if [[ $CLEAN == "true" ]]; then
-        delete-previous-cluster
-    fi
     if [[ $DOWN == "true" ]]; then
         delete-previous-cluster
         exit 0
+    fi
+    if [[ $CLEAN == "true" ]]; then
+        delete-previous-cluster
     fi
     create-cluster
     generate-report

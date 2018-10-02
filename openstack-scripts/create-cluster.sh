@@ -36,8 +36,12 @@ ANSIBLE_USER_DATA=""
 function read-config() {
     local config="$1"
 
-    WINDOWS_NODES=$(crudini --get $config windows server-names)
-    LINUX_NODES=$(crudini --get $config linux server-names)
+    IFS=$","
+    WINDOWS=$(crudini --get $config windows server-names)
+    LINUX=$(crudini --get $config linux server-names)
+    WINDOWS_NODES=($WINDOWS)
+    LINUX_NODES=($LINUX)
+    IFS=$" "
 
     WINDOWS_USER_DATA=$(crudini --get $config windows user-data)
     LINUX_USER_DATA=$(crudini --get $config linux user-data)
@@ -59,17 +63,16 @@ function read-config() {
 
     echo "CONFIG IS:"
     echo "----------------------------------------------"
-    echo "Windows nodes are:        $WINDOWS_NODES"
+    echo "Windows nodes are:        ${WINDOWS_NODES[@]}"
     echo "Windows user data script: $WINDOWS_USER_DATA"
     echo "Windows flavor:           $WINDOWS_FLAVOR"
     echo "Windows image:            $WINDOWS_IMAGE"
     echo "----------------------------------------------"
-    echo "Linux nodes are:          $LINUX_NODES"
+    echo "Linux nodes are:          ${LINUX_NODES[@]}"
     echo "Linux user data script:   $LINUX_USER_DATA"
     echo "Linux flavor:             $LINUX_FLAVOR"
     echo "Linux image:              $LINUX_IMAGE"
     echo "----------------------------------------------"
-    echo "Public key: $PUBLIC_KEY"
     echo "Private key: $PRIVATE_KEY"
     echo "----------------------------------------------"
 }
@@ -84,15 +87,15 @@ function delete-instance () {
 }
 
 function delete-previous-cluster () {
-    IFS=","
-    for server in $WINDOWS_NODES; do
+    for server in ${WINDOWS_NODES[@]}; do
         delete-instance $server
     done
-    for server in $LINUX_NODES; do
+    for server in ${LINUX_NODES[@]}; do
         delete-instance $server
     done
-    delete-instance $ANSIBLE_SERVER
-    IFS=$" "
+    if [[ "$ANSIBLE_MASTER" == "true" ]]; then
+        delete-instance $ANSIBLE_SERVER
+    fi
 }
 
 function boot-instance () {
@@ -111,7 +114,7 @@ function boot-instance () {
 }
 
 function boot-ansible () {
-    if [[ $ANSIBLE_MASTER == "true" ]]; then
+    if [[ "$ANSIBLE_MASTER" == "true" ]]; then
         echo "Booting Ansible master instance"
         nova boot --flavor $WINDOWS_FLAVOR --image $LINUX_IMAGE --nic net-id=$NETWORK_INTERNAL --key $KEY_NAME --user-data $ANSIBLE_USER_DATA $ANSIBLE_SERVER > /dev/null
         ip=$(openstack floating ip create $NETWORK_EXTERNAL | grep " name " | awk '{print $4}')
@@ -120,38 +123,64 @@ function boot-ansible () {
 }
 
 function create-cluster () {
-    IFS=","
-    for server in $WINDOWS_NODES; do
+    for server in ${WINDOWS_NODES[@]}; do
         boot-instance $server "WINDOWS"
     done
-    for server in $LINUX_NODES; do
+    for server in ${LINUX_NODES[@]}; do
         boot-instance $server "LINUX"
     done
     boot-ansible
-    IFS=$" "
 }
 
 function generate-report () {
-    echo "REPORT:"
-    echo "Linux servers created:"
-    IFS=","
-    for server in $LINUX_NODES; do
+    local report="$1"
+
+    declare -a ips_linux
+    declare -a ips_windows
+    declare -a passwords
+
+    for server in ${WINDOWS_NODES[@]}; do
         ip=$(openstack server show $server | grep address | awk '{print $5}')
-        echo "$server | $ip"
-    done
-    echo "----------------------------------------------"
-    echo "Windows servers created:"
-    for server in $WINDOWS_NODES; do
-        ip=$(openstack server show $server | grep address | awk '{print $5}')
+        ips_windows+=($ip)
         pass=$(nova get-password $server $PRIVATE_KEY)
-        echo "$server | $ip | $pass"
+        passwords+=($pass)
     done
-    echo "----------------------------------------------"
+    for server in ${LINUX_NODES[@]}; do
+        ip=$(openstack server show $server | grep address | awk '{print $5}')
+        ips_linux+=($ip)
+    done
+    ansible_master_ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
+    ips_linux=($ansible_master_ip ${ips_linux[@]})
+
+    LINUX_NODES=($ANSIBLE_SERVER ${LINUX_NODES[@]})
+    set -x
+    IFS=","
+    crudini --set $report linux server-names "${LINUX_NODES[*]}"
+    crudini --set $report windows server-names "${WINDOWS_NODES[*]}"
+
+    crudini --set $report linux ips "${ips_linux[*]}"
+    crudini --set $report windows ips "${ips_windows[*]}"
+
+    crudini --set $report linux ssh-key "~/id_rsa" # remote location of ssh key
+    crudini --set $report windows passwords "${passwords[*]}"
     IFS=$" "
 }
 
+function prepare-ansible-node () {
+    local report="$1"
+
+    local ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
+    sleep 15 # sleep till node becomes available
+    ssh-keyscan -H $ip >> ~/.ssh/known_hosts
+
+    scp -i $PRIVATE_KEY $PRIVATE_KEY $ip:~/
+    scp -i $PRIVATE_KEY $report $ip:~/
+    scp -i $PRIVATE_KEY ansible-script.sh $ip:~/
+    ssh -i $PRIVATE_KEY $ip 'cat | bash /dev/stdin --report report.ini' < ansible-script.sh
+}
+
 function main() {
-    TEMP=$(getopt -o c:x::d::a:: --long config:,clean::,down::,ansible:: -n '' -- "$@")
+    TEMP=$(getopt -o c:r:x::d::a:: --long config:,report:,clean::,down::,ansible:: -n '' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -163,6 +192,8 @@ function main() {
         case "$1" in
             --config)
                 CONFIG="$2";           shift 2;;
+            --report)
+                REPORT="$2";           shift 2;;
             --clean)
                 CLEAN="true";          shift 2;;
             --down)
@@ -182,7 +213,8 @@ function main() {
         delete-previous-cluster
     fi
     create-cluster
-    generate-report
+    generate-report "$REPORT"
+    prepare-ansible-node "$REPORT"
 }
 
 main "$@"

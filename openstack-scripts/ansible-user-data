@@ -1,5 +1,5 @@
 #!/bin/bash
 
 sudo apt-get update && sudo apt-get upgrade -y
-sudo apt-get install python python-pip -y
+sudo apt-get install python python-pip crudini -y
 sudo pip install pywinrm

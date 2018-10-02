@@ -9,7 +9,7 @@ The workflow is the following:
   
 ## How to
 
-The main script is create-cluster.sh and it supports the following parameters
+The main script is create-cluster.sh and it supports the following parameters:
 
 ```bash
 --config  # config file to be used
@@ -37,7 +37,7 @@ Example usage:
 ./create-cluster.sh --config k8s-cluster.ini --down --ansible
 
 # delete previous cluster and spawn a new one with ansible master
-./create-cluster.sh --config k8s-cluster.ini --ansible --report report.ini --clean
+./create-cluster.sh --config k8s-cluster.ini --ansible --clean
 ```
 
 The config file:
@@ -66,7 +66,11 @@ name =                       # name of the key in openstack (must be the public 
 [network]
 internal =                   # openstack internal network
 external =                   # openstack external network
+
+[report]
+file-path =                  # path to report.ini, it's used to report nodes to the ansible master machine
 ```
+k8s-cluster.ini is the config file used right now, please use it as an example.
 
 ### What to avoid:
 

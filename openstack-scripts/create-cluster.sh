@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# This script creates instances based on a ini file
-#
-# The options are:
-#     --config /path/to/config/file # this should be the config ini file
-#     --clean                       # will destroy the instances if they exist
-#     --down                        # will just delete the instances
-
 set -e
 
 set -o pipefail
@@ -32,6 +25,8 @@ NETWORK_EXTERNAL=""
 ANSIBLE_MASTER=""
 ANSIBLE_SERVER=""
 ANSIBLE_USER_DATA=""
+
+REPORT_FILE=""
 
 function read-config() {
     local config="$1"
@@ -60,6 +55,8 @@ function read-config() {
 
     ANSIBLE_SERVER=$(crudini --get $config ansible server-name)
     ANSIBLE_USER_DATA=$(crudini --get $config ansible user-data)
+
+    REPORT_FILE=$(crudini --get $config report file-path)
 
     echo "CONFIG IS:"
     echo "----------------------------------------------"
@@ -180,7 +177,7 @@ function prepare-ansible-node () {
 }
 
 function main() {
-    TEMP=$(getopt -o c:r:x::d::a:: --long config:,report:,clean::,down::,ansible:: -n '' -- "$@")
+    TEMP=$(getopt -o c:x::d::a:: --long config:,clean::,down::,ansible:: -n '' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -192,8 +189,6 @@ function main() {
         case "$1" in
             --config)
                 CONFIG="$2";           shift 2;;
-            --report)
-                REPORT="$2";           shift 2;;
             --clean)
                 CLEAN="true";          shift 2;;
             --down)
@@ -213,8 +208,8 @@ function main() {
         delete-previous-cluster
     fi
     create-cluster
-    generate-report "$REPORT"
-    prepare-ansible-node "$REPORT"
+    generate-report "$REPORT_FILE"
+    prepare-ansible-node "$REPORT_FILE"
 }
 
 main "$@"

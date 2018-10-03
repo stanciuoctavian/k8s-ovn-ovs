@@ -145,11 +145,7 @@ function generate-report () {
         ip=$(openstack server show $server | grep address | awk '{print $5}')
         ips_linux+=($ip)
     done
-    ansible_master_ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
-    ips_linux=($ansible_master_ip ${ips_linux[@]})
 
-    LINUX_NODES=($ANSIBLE_SERVER ${LINUX_NODES[@]})
-    set -x
     IFS=","
     crudini --set $report linux server-names "${LINUX_NODES[*]}"
     crudini --set $report windows server-names "${WINDOWS_NODES[*]}"
@@ -158,12 +154,12 @@ function generate-report () {
     crudini --set $report windows ips "${ips_windows[*]}"
 
     crudini --set $report linux ssh-key "~/id_rsa" # remote location of ssh key
-    crudini --set $report windows password $password
     IFS=$" "
 }
 
 function prepare-ansible-node () {
-    local report="$1"
+    local report="$1"; shift
+    local password="$1"
 
     local ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
     sleep 15 # sleep till node becomes available
@@ -171,8 +167,7 @@ function prepare-ansible-node () {
 
     scp -i $PRIVATE_KEY $PRIVATE_KEY $ip:~/
     scp -i $PRIVATE_KEY $report $ip:~/
-    scp -i $PRIVATE_KEY ansible-script.sh $ip:~/
-    ssh -i $PRIVATE_KEY $ip 'cat | bash /dev/stdin --report report.ini' < ansible-script.sh
+    ssh -i $PRIVATE_KEY $ip "cat | bash /dev/stdin --report $report --password $password" < ansible-script.sh
 }
 
 function main() {
@@ -210,8 +205,8 @@ function main() {
     fi
     create-cluster
     if [[ $ANSIBLE_MASTER == "true" ]]; then
-        generate-report "$REPORT_FILE" "$PASSWORD"
-        prepare-ansible-node "$REPORT_FILE"
+        generate-report "$REPORT_FILE"
+        prepare-ansible-node "$REPORT_FILE" "$PASSWORD"
     fi
 }
 

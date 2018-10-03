@@ -106,7 +106,7 @@ function ssh-key-scan () {
 }
 
 function main () {
-    TEMP=$(getopt -o r:p: --long report:password: -n '' -- "$@")
+    TEMP=$(getopt -o r:p: --long report:,password: -n 'ansible-script.sh' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi

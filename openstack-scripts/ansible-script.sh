@@ -15,6 +15,7 @@ declare -a PASSWORDS
 PRIVATE_KEY=""
 
 function wait-user-data () {
+    echo "Waiting for crudini to be available"
     while true; do
         x=$(which crudini || true)
         if [[ -z $x ]]; then
@@ -28,6 +29,7 @@ function wait-user-data () {
 function read-report () {
     local report="$1"
 
+    echo "Reading report"
     IFS=$","
     WINDOWS=$(crudini --get $report windows server-names)
     LINUX=$(crudini --get $report linux server-names)
@@ -38,9 +40,6 @@ function read-report () {
     LINUX=$(crudini --get $report linux ips)
     WINDOWS_IP=($WINDOWS)
     LINUX_IP=($LINUX)
-
-    PASS=$(crudini --get $report windows passwords)
-    PASSWORDS=($PASS)
     IFS=$" "
 }
 
@@ -48,12 +47,15 @@ function clone-repo () {
     local repo="$1"; shift
     local destination="$1"
 
+    echo "Cloning repo"
     git clone $repo "$destination"
 }
  
 function populate-etc-hosts () {
     local length_linux=${#LINUX_NODES[@]}
     local length_windows=${#WINDOWS_NODES[@]}
+
+    echo "Populating /etc/hosts"
     for (( i=0; i < $length_linux; i++ )); do
         printf "%s %s\n" "${LINUX_IP[$i]}" "${LINUX_NODES[$i]}" | sudo tee -a /etc/hosts
     done
@@ -65,6 +67,7 @@ function populate-etc-hosts () {
 function populate-ansible-hosts () {
     local file="$1"
 
+    echo "Populating ansible invetory hosts"
     sed -i "s/node.//g" "$file"
     let i=1
     for server in ${LINUX_NODES[@]}; do
@@ -84,6 +87,7 @@ function configure-linux-connection () {
     local file_master="$1"; shift
     local file_minions="$1"
 
+    echo "Configure ansible to use ssh key for linux minions"
     sed -i "/ubuntu/a ansible_ssh_private_key_file: ~\/id_rsa" $file_master
     sed -i "/ubuntu/a ansible_ssh_private_key_file: ~\/id_rsa" $file_minions
 }
@@ -91,17 +95,18 @@ function configure-linux-connection () {
 function create-windows-login-file () {
     local password="$1"
 
-    local template='ansible_user: administrator
-ansible_password: %s'
+    local template='ansible_user: administrator\nansible_password: %s'
 
+    echo "Creating individual file for windows minions(winrm)"
     for server in ${WINDOWS_NODES[@]}; do
-        printf $template $password > "ovn-kubernetes/contrib/inventory/host_vars/$server"
+        printf "$template" $password > "ovn-kubernetes/contrib/inventory/host_vars/$server"
     done
 }
 
 function ssh-key-scan () {
-    for server in ${LINUX_IP[@]}; do
-        ssh-keyscan -H $server >> ~/.ssh/known_hosts
+    echo "ssh keyscan for linux minions"
+    for server in ${LINUX_NODES[@]}; do
+        ssh-keyscan $server >> ~/.ssh/known_hosts
     done
 }
 

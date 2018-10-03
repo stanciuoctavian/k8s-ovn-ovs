@@ -110,6 +110,19 @@ function ssh-key-scan () {
     done
 }
 
+function deploy-k8s-cluster () {
+    pushd "ovn-kubernetes/contrib"
+        while true; do
+            if ansible -m setup all > /dev/null; then
+                break
+            else 
+                sleep 5
+            fi
+        done
+        ansible-playbook ovn-kubernetes-cluster.yml
+    popd
+}
+
 function main () {
     TEMP=$(getopt -o r:p: --long report:,password: -n 'ansible-script.sh' -- "$@")
     if [[ $? -ne 0 ]]; then
@@ -138,6 +151,7 @@ function main () {
         "./ovn-kubernetes/contrib/inventory/group_vars/kube-minions-linux"
     create-windows-login-file "$password"
     ssh-key-scan
+    deploy-k8s-cluster
 }
 
 main "$@"

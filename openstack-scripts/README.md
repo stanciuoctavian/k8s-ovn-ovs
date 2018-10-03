@@ -76,6 +76,8 @@ file-path =                  # path to report.ini, it's used to report nodes to 
 ```
 k8s-cluster.ini is the config file used right now, please use it as an example.
 
-### What to avoid:
+### What to pay attention to:
 
 Don't give servers names longer than 15 chars since on Windows by default 15 is the limit, and k8s also has a limit.
+
+It is advised tp run the script in screen, since it takes a while to deploy the k8s cluster.

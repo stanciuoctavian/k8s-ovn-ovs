@@ -89,12 +89,13 @@ function configure-linux-connection () {
 }
 
 function create-windows-login-file () {
-    local template='ansible_user: admin
+    local password="$1"
+
+    local template='ansible_user: administrator
 ansible_password: %s'
 
-    local length=${#WINDOWS_NODES[@]}
-    for (( i=0; i < $length; i++ )); do
-        printf $template $password > "ovn-kubernetes/contrib/inventory/host_vars/$host"
+    for server in ${WINDOWS_NODES[@]}; do
+        printf $template $password > "ovn-kubernetes/contrib/inventory/host_vars/$server"
     done
 }
 
@@ -105,7 +106,7 @@ function ssh-key-scan () {
 }
 
 function main () {
-    TEMP=$(getopt -o r: --long report: -n '' -- "$@")
+    TEMP=$(getopt -o r:p: --long report:password: -n '' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -117,6 +118,8 @@ function main () {
         case "$1" in
             --report)
                 report="$2";           shift 2;;
+            --password)
+                password="$2";         shift 2;;
             --) shift ; break ;;
         esac
     done
@@ -128,7 +131,7 @@ function main () {
     populate-ansible-hosts "./ovn-kubernetes/contrib/inventory/hosts"
     configure-linux-connection "./ovn-kubernetes/contrib/inventory/group_vars/kube-master" \
         "./ovn-kubernetes/contrib/inventory/group_vars/kube-minions-linux"
-    create-windows-login-file
+    create-windows-login-file "$password"
     ssh-key-scan
 }
 

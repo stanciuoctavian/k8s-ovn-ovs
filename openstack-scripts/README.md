@@ -12,10 +12,11 @@ The workflow is the following:
 The main script is create-cluster.sh and it supports the following parameters:
 
 ```bash
---config  # config file to be used
---clean   # will delete the cluster if it's already up and create a new one
---down    # will just delete the current cluster
---ansible # also spawns an ansible-machine and configures it
+--config   # config file to be used
+--clean    # will delete the cluster if it's already up and create a new one
+--down     # will just delete the current cluster
+--ansible  # also spawns an ansible-machine and configures it
+--password # the password of the windows images
 ```
 
 Example usage:
@@ -38,6 +39,9 @@ Example usage:
 
 # delete previous cluster and spawn a new one with ansible master
 ./create-cluster.sh --config k8s-cluster.ini --ansible --clean
+
+# create cluster with default password for windows images
+./create-cluster.sh --config k8s-cluster.ini --password <password>
 ```
 
 The config file:

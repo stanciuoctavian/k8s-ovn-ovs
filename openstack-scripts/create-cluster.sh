@@ -112,7 +112,7 @@ function boot-instance () {
 
 function boot-ansible () {
     if [[ "$ANSIBLE_MASTER" == "true" ]]; then
-        echo "Booting Ansible master instance"
+        echo "Booting Ansible master"
         nova boot --flavor $WINDOWS_FLAVOR --image $LINUX_IMAGE --nic net-id=$NETWORK_INTERNAL --key $KEY_NAME --user-data $ANSIBLE_USER_DATA $ANSIBLE_SERVER > /dev/null
         ip=$(openstack floating ip create $NETWORK_EXTERNAL | grep " name " | awk '{print $4}')
         openstack server add floating ip $ANSIBLE_SERVER $ip
@@ -130,7 +130,8 @@ function create-cluster () {
 }
 
 function generate-report () {
-    local report="$1"
+    local report="$1"; shift
+    local password="$1"
 
     declare -a ips_linux
     declare -a ips_windows
@@ -139,8 +140,6 @@ function generate-report () {
     for server in ${WINDOWS_NODES[@]}; do
         ip=$(openstack server show $server | grep address | awk '{print $5}')
         ips_windows+=($ip)
-        pass=$(nova get-password $server $PRIVATE_KEY)
-        passwords+=($pass)
     done
     for server in ${LINUX_NODES[@]}; do
         ip=$(openstack server show $server | grep address | awk '{print $5}')
@@ -159,7 +158,7 @@ function generate-report () {
     crudini --set $report windows ips "${ips_windows[*]}"
 
     crudini --set $report linux ssh-key "~/id_rsa" # remote location of ssh key
-    crudini --set $report windows passwords "${passwords[*]}"
+    crudini --set $report windows password $password
     IFS=$" "
 }
 
@@ -177,7 +176,7 @@ function prepare-ansible-node () {
 }
 
 function main() {
-    TEMP=$(getopt -o c:x::d::a:: --long config:,clean::,down::,ansible:: -n '' -- "$@")
+    TEMP=$(getopt -o c:x::d::a::p: --long config:,clean::,down::,ansible::,password: -n '' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -195,6 +194,8 @@ function main() {
                 DOWN="true";           shift 2;;
             --ansible)
                 ANSIBLE_MASTER="true"; shift 2;;
+            --password)
+                PASSWORD="$2";         shift 2;;
             --) shift ; break ;;
         esac
     done
@@ -208,8 +209,10 @@ function main() {
         delete-previous-cluster
     fi
     create-cluster
-    generate-report "$REPORT_FILE"
-    prepare-ansible-node "$REPORT_FILE"
+    if [[ $ANSIBLE_MASTER == "true" ]]; then
+        generate-report "$REPORT_FILE" "$PASSWORD"
+        prepare-ansible-node "$REPORT_FILE"
+    fi
 }
 
 main "$@"

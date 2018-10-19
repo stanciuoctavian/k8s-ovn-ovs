@@ -40,6 +40,9 @@ function read-report () {
     LINUX=$(crudini --get $report linux ips)
     WINDOWS_IP=($WINDOWS)
     LINUX_IP=($LINUX)
+
+    WINDOWS=$(crudini --get $report windows passwords)
+    PASSWORDS=($WINDOWS)
     IFS=$" "
 }
 
@@ -95,11 +98,12 @@ function configure-linux-connection () {
 function create-windows-login-file () {
     local password="$1"
 
-    local template='ansible_user: administrator\nansible_password: %s'
+    local template='ansible_user: admin\nansible_password: %s'
 
     echo "Creating individual file for windows minions(winrm)"
-    for server in ${WINDOWS_NODES[@]}; do
-        printf "$template" $password > "ovn-kubernetes/contrib/inventory/host_vars/$server"
+    length=${#WINDOWS_NODES[@]}
+    for (( i=0; i < $length; i++ )); do
+        printf "$template" ${PASSWORDS[$i]} > "ovn-kubernetes/contrib/inventory/host_vars/${WINDOWS_NODES[$i]}"
     done
 }
 

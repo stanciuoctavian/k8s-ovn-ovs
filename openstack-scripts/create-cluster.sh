@@ -129,6 +129,21 @@ function create-cluster () {
     boot-ansible
 }
 
+function wait-windows-nodes () {
+    echo "Waiting for windows nodes to get password"
+
+    for server in ${WINDOWS_NODES[@]}; do
+        while true; do
+            pass=$(nova get-password $server $PRIVATE_KEY)
+            if [[ -z $pass ]]; then
+                sleep 5
+            else
+                break
+            fi
+        done
+    done
+}
+
 function generate-report () {
     local report="$1"; shift
     local password="$1"
@@ -140,6 +155,8 @@ function generate-report () {
     for server in ${WINDOWS_NODES[@]}; do
         ip=$(openstack server show $server | grep address | awk '{print $5}')
         ips_windows+=($ip)
+        pass=$(nova get-password $server $PRIVATE_KEY)
+        passwords+=($pass)
     done
     for server in ${LINUX_NODES[@]}; do
         ip=$(openstack server show $server | grep address | awk '{print $5}')
@@ -152,14 +169,14 @@ function generate-report () {
 
     crudini --set $report linux ips "${ips_linux[*]}"
     crudini --set $report windows ips "${ips_windows[*]}"
+    crudini --set $report windows passwords "${passwords[*]}"
 
     crudini --set $report linux ssh-key "~/id_rsa" # remote location of ssh key
     IFS=$" "
 }
 
 function prepare-ansible-node () {
-    local report="$1"; shift
-    local password="$1"
+    local report="$1";
 
     local ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
     sleep 15 # sleep till node becomes available
@@ -167,11 +184,11 @@ function prepare-ansible-node () {
 
     scp -i $PRIVATE_KEY $PRIVATE_KEY $ip:~/
     scp -i $PRIVATE_KEY $report $ip:~/
-    ssh -i $PRIVATE_KEY $ip "cat | bash /dev/stdin --report $report --password $password" < ansible-script.sh
+    ssh -i $PRIVATE_KEY $ip "cat | bash /dev/stdin --report $report" < ansible-script.sh
 }
 
 function main() {
-    TEMP=$(getopt -o c:x::d::a::p: --long config:,clean::,down::,ansible::,password: -n '' -- "$@")
+    TEMP=$(getopt -o c:x::d::a:: --long config:,clean::,down::,ansible:: -n '' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -189,8 +206,6 @@ function main() {
                 DOWN="true";           shift 2;;
             --ansible)
                 ANSIBLE_MASTER="true"; shift 2;;
-            --password)
-                PASSWORD="$2";         shift 2;;
             --) shift ; break ;;
         esac
     done
@@ -204,9 +219,10 @@ function main() {
         delete-previous-cluster
     fi
     create-cluster
+    wait-windows-nodes
     if [[ $ANSIBLE_MASTER == "true" ]]; then
         generate-report "$REPORT_FILE"
-        prepare-ansible-node "$REPORT_FILE" "$PASSWORD"
+        prepare-ansible-node "$REPORT_FILE"
     fi
 }
 

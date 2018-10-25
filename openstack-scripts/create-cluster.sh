@@ -78,9 +78,7 @@ function delete-instance () {
     local server="$1"
 
     echo "Now deleting : $server"
-    ip=$(openstack server show $server | grep address | awk '{print $5}')
     openstack server delete "$server"
-    openstack floating ip delete $ip
 }
 
 function delete-previous-cluster () {
@@ -92,6 +90,8 @@ function delete-previous-cluster () {
     done
     if [[ "$ANSIBLE_MASTER" == "true" ]]; then
         delete-instance $ANSIBLE_SERVER
+        ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
+        openstack floating ip delete $ip
     fi
 }
 
@@ -106,8 +106,6 @@ function boot-instance () {
 
     echo "Now booting : $server"
     nova boot --flavor $flavor --image $image --nic net-id=$NETWORK_INTERNAL --key $KEY_NAME --user-data $user_data $server > /dev/null
-    ip=$(openstack floating ip create $NETWORK_EXTERNAL | grep " name " | awk '{print $4}')
-    openstack server add floating ip $server $ip
 }
 
 function boot-ansible () {
@@ -153,13 +151,13 @@ function generate-report () {
     declare -a passwords
 
     for server in ${WINDOWS_NODES[@]}; do
-        ip=$(openstack server show $server | grep address | awk '{print $5}')
+        ip=$(openstack server show $server | grep address | awk '{print $4}'); ip=${ip#*=}; ip=${ip%,}
         ips_windows+=($ip)
         pass=$(nova get-password $server $PRIVATE_KEY)
         passwords+=($pass)
     done
     for server in ${LINUX_NODES[@]}; do
-        ip=$(openstack server show $server | grep address | awk '{print $5}')
+        ip=$(openstack server show $server | grep address | awk '{print $4}'); ip=${ip#*=}; ip=${ip%,}
         ips_linux+=($ip)
     done
 
@@ -185,6 +183,14 @@ function prepare-ansible-node () {
     scp -i $PRIVATE_KEY $PRIVATE_KEY $ip:~/
     scp -i $PRIVATE_KEY $report $ip:~/
     ssh -i $PRIVATE_KEY $ip "cat | bash /dev/stdin --report $report" < ansible-script.sh
+}
+
+function prepare-tests () {
+    local ansible_ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
+    local master_ip=$(openstack server show ${LINUX_NODES[0]} | grep address | awk '{print $4}'); master_ip=${master_ip#*=}; master_ip=${master_ip%,}
+
+    scp -i $PRIVATE_KEY -r run-e2e/ $ansible_ip:~/
+    ssh -i $PRIVATE_KEY $ansible_ip "cat | bash /dev/stdin --k8s-master-ip $master_ip --id-rsa ~/id_rsa" < prepare-tests.sh
 }
 
 function main() {
@@ -217,13 +223,16 @@ function main() {
     fi
     if [[ $CLEAN == "true" ]]; then
         delete-previous-cluster
+        echo ""
     fi
     create-cluster
     wait-windows-nodes
     if [[ $ANSIBLE_MASTER == "true" ]]; then
         generate-report "$REPORT_FILE"
         prepare-ansible-node "$REPORT_FILE"
+        prepare-tests
     fi
+
 }
 
 main "$@"

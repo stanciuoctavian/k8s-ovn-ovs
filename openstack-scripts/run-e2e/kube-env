@@ -1,0 +1,5 @@
+export KUBE_MASTER=
+export KUBE_MASTER_IP=
+export KUBE_MASTER_URL=
+export KUBECONFIG=
+export KUBE_TEST_REPO_LIST=

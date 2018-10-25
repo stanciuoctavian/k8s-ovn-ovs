@@ -52,6 +52,9 @@ function clone-repo () {
 
     echo "Cloning repo"
     git clone $repo "$destination"
+    pushd "$destination"
+        git checkout update_ansible
+    popd
 }
  
 function populate-etc-hosts () {
@@ -96,8 +99,6 @@ function configure-linux-connection () {
 }
 
 function create-windows-login-file () {
-    local password="$1"
-
     local template='ansible_user: admin\nansible_password: %s'
 
     echo "Creating individual file for windows minions(winrm)"
@@ -111,10 +112,13 @@ function ssh-key-scan () {
     echo "ssh keyscan for linux minions"
     for server in ${LINUX_NODES[@]}; do
         ssh-keyscan $server >> ~/.ssh/known_hosts
+        sudo bash -c "ssh-keyscan $server >> /root/.ssh/known_hosts"
     done
 }
 
 function deploy-k8s-cluster () {
+    echo "starting kubernetes deployment"
+    sudo cp /home/ubuntu/id_rsa /root/
     pushd "ovn-kubernetes/contrib"
         while true; do
             if ansible -m setup all > /dev/null; then
@@ -123,12 +127,12 @@ function deploy-k8s-cluster () {
                 sleep 5
             fi
         done
-        ansible-playbook ovn-kubernetes-cluster.yml
+        sudo bash -c "ansible-playbook ovn-kubernetes-cluster.yml"
     popd
 }
 
 function main () {
-    TEMP=$(getopt -o r:p: --long report:,password: -n 'ansible-script.sh' -- "$@")
+    TEMP=$(getopt -o r: --long report: -n 'ansible-script.sh' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -140,20 +144,18 @@ function main () {
         case "$1" in
             --report)
                 report="$2";           shift 2;;
-            --password)
-                password="$2";         shift 2;;
             --) shift ; break ;;
         esac
     done
 
     wait-user-data
     read-report "$report"
-    clone-repo "https://github.com/openvswitch/ovn-kubernetes.git" "./ovn-kubernetes"
+    clone-repo "https://github.com/alinbalutoiu/ovn-kubernetes.git" "./ovn-kubernetes"
     populate-etc-hosts
     populate-ansible-hosts "./ovn-kubernetes/contrib/inventory/hosts"
     configure-linux-connection "./ovn-kubernetes/contrib/inventory/group_vars/kube-master" \
         "./ovn-kubernetes/contrib/inventory/group_vars/kube-minions-linux"
-    create-windows-login-file "$password"
+    create-windows-login-file
     ssh-key-scan
     deploy-k8s-cluster
 }

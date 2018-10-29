@@ -42,17 +42,15 @@ function install-kubectl () {
 
 function install-go() {
     echo "Installing golang"
-    GO_VERSION="1.10"
 
     DEBIAN_FRONTEND=noninteractive sudo apt-get install golang-$GO_VERSION-go -y
     mkdir -p $HOME/go/{bin,pkg,src}
 
     local template="""
-GO_VERSION=$GO_VERSION;
-export GOROOT=/usr/lib/go-$GO_VERSION;
-export GOBIN=$GOROOT/bin;
-export GOPATH="$HOME/go";
-export PATH=$GOROOT/bin:$PATH:$GOPATH/bin;
+export GOROOT=/usr/lib/go-1.10
+export GOBIN=/usr/lib/go-1.10/bin
+export GOPATH=/home/ubuntu/go
+export PATH=/usr/lib/go-1.10/bin:$PATH:/home/ubuntu/go/bin;
 """
     echo $template >> ~/.bashrc    
 }

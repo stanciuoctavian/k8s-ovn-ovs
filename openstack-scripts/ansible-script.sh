@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -x
 
 set -o pipefail
 
@@ -51,10 +52,12 @@ function clone-repo () {
     local destination="$1"
 
     echo "Cloning repo"
-    git clone $repo "$destination"
-    pushd "$destination"
-        git checkout update_ansible
-    popd
+    if [[ ! -d "$destination" ]]; then
+        git clone $repo "$destination"
+        pushd "$destination"
+            git checkout custom_url
+        popd
+    fi
 }
  
 function populate-etc-hosts () {
@@ -116,6 +119,80 @@ function ssh-key-scan () {
     done
 }
 
+function install-go() {
+    echo "Installing golang"
+
+    pushd /tmp
+        wget https://dl.google.com/go/go1.11.1.linux-amd64.tar.gz
+        tar -xf go1.11.1.linux-amd64.tar.gz
+        sudo mv go /usr/lib
+    popd
+
+    mkdir -p $HOME/go/{bin,pkg,src}
+
+    local template="""
+export GOROOT=/usr/lib/go
+export GOBIN=/usr/lib/go/bin
+export GOPATH=/home/ubuntu/go
+export PATH=/usr/lib/go/bin:$PATH:/home/ubuntu/go/bin;
+"""
+    echo $template >> ~/.bashrc
+}
+
+function install-bazel () {
+    if [[ -z $(which bazel) ]]; then
+        sudo apt-get install unzip -y
+        if [[ ! -a  bazel-0.18.0-installer-linux-x86_64.sh ]]; then
+            wget https://github.com/bazelbuild/bazel/releases/download/0.18.0/bazel-0.18.0-installer-linux-x86_64.sh
+        fi
+        chmod +x bazel-0.18.0-installer-linux-x86_64.sh
+        ./bazel-0.18.0-installer-linux-x86_64.sh --user
+        echo "export PATH=/home/ubuntu/bin:$PATH" >> ~/.bashrc
+    fi
+}
+
+function set-custom-ip-ansible () {
+    local version="$1"
+
+    pushd "ovn-kubernetes/contrib/inventory/group_vars"
+        ip=$(hostname -I)
+        sed -i "s/https:\/\/dl.k8s.io/http:\/\/$ip/" all
+        sed -i "s/v1.12.0/$version/" all
+    popd
+}
+
+function build-k8s-binaries () {
+    set -x
+    sudo apt-get install apache2 -y
+
+    source ~/.bashrc
+export GOROOT=/usr/lib/go
+export GOBIN=/usr/lib/go/bin
+export GOPATH=/home/ubuntu/go
+export PATH=/usr/lib/go/bin:$PATH:/home/ubuntu/go/bin
+export PATH=/home/ubuntu/bin:$PATH
+    go get -d "k8s.io/kubernetes" || true
+    pushd $GOPATH/src/k8s.io/kubernetes
+        make bazel-release
+
+        pushd bazel-bin/build/release-tars
+            tar xf kubernetes.tar.gz || true
+            version=$(cat kubernetes/version)
+        popd
+
+        KUBE_BUILD_PLATFORMS=windows/amd64 make WHAT=cmd/kubelet
+        KUBE_BUILD_PLATFORMS=windows/amd64 make WHAT=cmd/kubectl
+
+        mkdir -p ~/ovn-kubernetes/contrib/tmp
+        cp _output/local/bin/windows/amd64/*.exe  ~/ovn-kubernetes/contrib/tmp
+
+        sudo mkdir -p /var/www/html/$version
+        sudo cp bazel-bin/build/release-tars/*.tar.gz /var/www/html/$version
+    popd
+
+    set-custom-ip-ansible $version
+}
+
 function deploy-k8s-cluster () {
     echo "starting kubernetes deployment"
     sudo cp /home/ubuntu/id_rsa /root/
@@ -150,13 +227,17 @@ function main () {
 
     wait-user-data
     read-report "$report"
-    clone-repo "https://github.com/alinbalutoiu/ovn-kubernetes.git" "./ovn-kubernetes"
+    clone-repo "https://github.com/papagalu/ovn-kubernetes.git" "./ovn-kubernetes"
     populate-etc-hosts
     populate-ansible-hosts "./ovn-kubernetes/contrib/inventory/hosts"
     configure-linux-connection "./ovn-kubernetes/contrib/inventory/group_vars/kube-master" \
         "./ovn-kubernetes/contrib/inventory/group_vars/kube-minions-linux"
     create-windows-login-file
     ssh-key-scan
+    install-go
+    install-bazel
+    build-k8s-binaries
+    exit 0
     deploy-k8s-cluster
 }
 

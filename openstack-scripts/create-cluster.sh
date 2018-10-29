@@ -7,6 +7,9 @@ set -o pipefail
 declare -a WINDOWS_NODES
 declare -a LINUX_NODES
 
+CONFIG="/etc/k8s-ovn-ovs/config.ini"
+OPENSTACK_ADMIN="/etc/k8s-ovn-ovs/admin-openrc.sh"
+
 WINDOWS_USER_DATA=""
 LINUX_USER_DATA=""
 
@@ -89,8 +92,8 @@ function delete-previous-cluster () {
         delete-instance $server
     done
     if [[ "$ANSIBLE_MASTER" == "true" ]]; then
-        delete-instance $ANSIBLE_SERVER
         ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
+        delete-instance $ANSIBLE_SERVER
         openstack floating ip delete $ip
     fi
 }
@@ -194,7 +197,7 @@ function prepare-tests () {
 }
 
 function main() {
-    TEMP=$(getopt -o c:x::d::a:: --long config:,clean::,down::,ansible:: -n '' -- "$@")
+    TEMP=$(getopt -o c:x::d::a::b: --long config:,clean::,down::,ansible::,admin-openrc: -n '' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -205,13 +208,16 @@ function main() {
     while true ; do
         case "$1" in
             --config)
-                CONFIG="$2";           shift 2;;
+                CONFIG="$2";             shift 2;;
             --clean)
-                CLEAN="true";          shift 2;;
+                CLEAN="true";            shift 2;;
             --down)
-                DOWN="true";           shift 2;;
+                DOWN="true";             shift 2;;
             --ansible)
-                ANSIBLE_MASTER="true"; shift 2;;
+                ANSIBLE_MASTER="true";   shift 2;;
+            --admin-openrc)
+                OPENSTACK_ADMIN="$2"
+                source $OPENSTACK_ADMIN; shift 2;;
             --) shift ; break ;;
         esac
     done

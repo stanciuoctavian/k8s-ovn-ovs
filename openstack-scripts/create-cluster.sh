@@ -179,6 +179,7 @@ function generate-report () {
 
 function prepare-ansible-node () {
     local report="$1";
+    local report_name=$(basename $report)
 
     local ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
     sleep 15 # sleep till node becomes available
@@ -186,7 +187,7 @@ function prepare-ansible-node () {
 
     scp -i $PRIVATE_KEY $PRIVATE_KEY $ip:~/
     scp -i $PRIVATE_KEY $report $ip:~/
-    ssh -i $PRIVATE_KEY $ip "cat | bash /dev/stdin --report $report" < ansible-script.sh
+    ssh -i $PRIVATE_KEY $ip "cat | bash /dev/stdin --report ~/$report" < ansible-script.sh
 }
 
 function prepare-tests () {

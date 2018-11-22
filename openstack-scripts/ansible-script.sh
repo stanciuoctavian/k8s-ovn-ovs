@@ -55,7 +55,7 @@ function clone-repo () {
     if [[ ! -d "$destination" ]]; then
         git clone $repo "$destination"
         pushd "$destination"
-            git checkout custom_url
+            git checkout diff_download
         popd
     fi
 }
@@ -139,18 +139,6 @@ export PATH=/usr/lib/go/bin:$PATH:/home/ubuntu/go/bin;
     echo $template >> ~/.bashrc
 }
 
-function install-bazel () {
-    if [[ -z $(which bazel) ]]; then
-        sudo apt-get install unzip -y
-        if [[ ! -a  bazel-0.18.0-installer-linux-x86_64.sh ]]; then
-            wget https://github.com/bazelbuild/bazel/releases/download/0.18.0/bazel-0.18.0-installer-linux-x86_64.sh
-        fi
-        chmod +x bazel-0.18.0-installer-linux-x86_64.sh
-        ./bazel-0.18.0-installer-linux-x86_64.sh --user
-        echo "export PATH=/home/ubuntu/bin:$PATH" >> ~/.bashrc
-    fi
-}
-
 function set-custom-ip-ansible () {
     local version="$1"
 
@@ -169,28 +157,23 @@ function build-k8s-binaries () {
 export GOROOT=/usr/lib/go
 export GOBIN=/usr/lib/go/bin
 export GOPATH=/home/ubuntu/go
-export PATH=/usr/lib/go/bin:$PATH:/home/ubuntu/go/bin
-export PATH=/home/ubuntu/bin:$PATH
+export PATH=/home/ubuntu/bin:/usr/lib/go/bin:$PATH:/home/ubuntu/go/bin
     go get -d "k8s.io/kubernetes" || true
     pushd $GOPATH/src/k8s.io/kubernetes
-        make bazel-release
-
-        pushd bazel-bin/build/release-tars
-            tar xf kubernetes.tar.gz || true
-            version=$(cat kubernetes/version)
-        popd
+        git checkout v1.12.2
+        make kube-apiserver
+        make kube-controller-manager
+        make kubelet
+        make kubectl
+        make kube-scheduler
 
         KUBE_BUILD_PLATFORMS=windows/amd64 make WHAT=cmd/kubelet
         KUBE_BUILD_PLATFORMS=windows/amd64 make WHAT=cmd/kubectl
 
         mkdir -p ~/ovn-kubernetes/contrib/tmp
         cp _output/local/bin/windows/amd64/*.exe  ~/ovn-kubernetes/contrib/tmp
-
-        sudo mkdir -p /var/www/html/$version
-        sudo cp bazel-bin/build/release-tars/*.tar.gz /var/www/html/$version
+        cp _output/local/bin/linux/amd64/kube*  ~/ovn-kubernetes/contrib/tmp
     popd
-
-    set-custom-ip-ansible $version
 }
 
 function deploy-k8s-cluster () {
@@ -235,9 +218,7 @@ function main () {
     create-windows-login-file
     ssh-key-scan
     install-go
-    install-bazel
     build-k8s-binaries
-    exit 0
     deploy-k8s-cluster
 }
 

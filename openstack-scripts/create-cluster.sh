@@ -82,7 +82,12 @@ function delete-instance () {
     local server="$1"
 
     echo "Now deleting : $server"
-    openstack server delete "$server"
+    exist=$(openstack server list | grep $server | wc -l) || true
+    if [[ ! $exist -eq 0 ]]; then
+        ip=$(openstack server show $server | grep address | awk '{print $5}')
+        openstack floating ip delete $ip || true
+        openstack server delete "$server"
+    fi
 }
 
 function delete-previous-cluster () {
@@ -93,9 +98,7 @@ function delete-previous-cluster () {
         delete-instance $server
     done
     if [[ "$ANSIBLE_MASTER" == "true" ]]; then
-        ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
         delete-instance $ANSIBLE_SERVER
-        openstack floating ip delete $ip
     fi
 }
 
@@ -110,6 +113,15 @@ function boot-instance () {
 
     echo "Now booting : $server"
     nova boot --flavor $flavor --image $image --nic net-id=$NETWORK_INTERNAL --key $KEY_NAME --user-data $user_data $server > /dev/null
+    while true; do
+        stat=$(openstack server list | grep $server | awk '{print $6}')
+        if [[ ! $stat -eq ACTIVE ]]; then
+            sleep 3
+        elif [[ $stat -eq ERROR ]]; then
+            echo "$server is in ERROR state."
+            exit 1
+        fi
+    done
 }
 
 function boot-ansible () {

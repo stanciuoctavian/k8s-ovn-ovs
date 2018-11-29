@@ -15,6 +15,9 @@ declare -a PASSWORDS
 
 PRIVATE_KEY=""
 
+KUBERNETES_REMOTE=""
+KUBERNETES_COMMIT=""
+
 function wait-user-data () {
     echo "Waiting for crudini to be available"
     while true; do
@@ -44,6 +47,10 @@ function read-report () {
 
     WINDOWS=$(crudini --get $report windows passwords)
     PASSWORDS=($WINDOWS)
+
+    KUBERNETES_REMOTE=$(crudini --get $report kubernetes noremote)
+    KUBERNETES_COMMIT=$(crudini --get $report kubernetes commit)
+
     IFS=$" "
 }
 
@@ -119,13 +126,15 @@ function ssh-key-scan () {
     done
 }
 
-function install-go() {
+function install-go () {
     echo "Installing golang"
 
     pushd /tmp
-        wget https://dl.google.com/go/go1.11.1.linux-amd64.tar.gz
-        tar -xf go1.11.1.linux-amd64.tar.gz
-        sudo mv go /usr/lib
+        if [[ ! -f go1.11.1.linux-amd64.tar.gz ]]; then
+            wget https://dl.google.com/go/go1.11.1.linux-amd64.tar.gz
+            tar -xf go1.11.1.linux-amd64.tar.gz
+            sudo mv go /usr/lib
+        fi
     popd
 
     mkdir -p $HOME/go/{bin,pkg,src}
@@ -139,14 +148,14 @@ export PATH=/usr/lib/go/bin:$PATH:/home/ubuntu/go/bin;
     echo $template >> ~/.bashrc
 }
 
-function set-custom-ip-ansible () {
-    local version="$1"
+function install-docker () {
+    if [[ $(program_is_installed docker) != "1" ]]; then
+        echo "Installing docker"
+        DEBIAN_FRONTEND=noninteractive sudo apt-get install docker.io -y
 
-    pushd "ovn-kubernetes/contrib/inventory/group_vars"
-        ip=$(hostname -I)
-        sed -i "s/https:\/\/dl.k8s.io/http:\/\/$ip/" all
-        sed -i "s/v1.12.0/$version/" all
-    popd
+        echo "Adding user $USER to docker group"
+        sudo usermod -a -G docker $USER
+    fi
 }
 
 function build-k8s-binaries () {
@@ -154,25 +163,29 @@ function build-k8s-binaries () {
     sudo apt-get install apache2 -y
 
     source ~/.bashrc
-export GOROOT=/usr/lib/go
-export GOBIN=/usr/lib/go/bin
-export GOPATH=/home/ubuntu/go
-export PATH=/home/ubuntu/bin:/usr/lib/go/bin:$PATH:/home/ubuntu/go/bin
-    go get -d "k8s.io/kubernetes" || true
-    pushd $GOPATH/src/k8s.io/kubernetes
-        git checkout v1.12.2
-        make kube-apiserver
-        make kube-controller-manager
-        make kubelet
-        make kubectl
-        make kube-scheduler
+    export GOROOT=/usr/lib/go
+    export GOBIN=/usr/lib/go/bin
+    export GOPATH=/home/ubuntu/go
+    export PATH=/home/ubuntu/bin:/usr/lib/go/bin:$PATH:/home/ubuntu/go/bin
 
-        KUBE_BUILD_PLATFORMS=windows/amd64 make WHAT=cmd/kubelet
-        KUBE_BUILD_PLATFORMS=windows/amd64 make WHAT=cmd/kubectl
+    mkdir -p ~/go/src/k8s.io
+    pushd ~/go/src/k8s.io
+        if [[ ! -d kubernetes ]]; then
+            git clone "https://github.com/$KUBERNETES_REMOTE/kubernetes"
+            pushd kubernetes
+                git checkout $KUBERNETES_COMMIT
+            popd
+        fi
+    popd
+
+    pushd $GOPATH/src/k8s.io/kubernetes
+        newgrp docker
+        ./build/run.sh make WHAT="cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet cmd/kubectl cmd/kube-scheduler"
+        ./build/run.sh make WHAT="cmd/kubelet cmd/kubectl" KUBE_BUILD_PLATFORMS=windows/amd64
 
         mkdir -p ~/ovn-kubernetes/contrib/tmp
-        cp _output/local/bin/windows/amd64/*.exe  ~/ovn-kubernetes/contrib/tmp
-        cp _output/local/bin/linux/amd64/kube*  ~/ovn-kubernetes/contrib/tmp
+        cp _output/dockerized/bin/windows/amd64/*.exe  ~/ovn-kubernetes/contrib/tmp
+        cp _output/dockerized/bin/linux/amd64/kube*  ~/ovn-kubernetes/contrib/tmp
     popd
 }
 
@@ -218,6 +231,7 @@ function main () {
     create-windows-login-file
     ssh-key-scan
     install-go
+    install-docker
     build-k8s-binaries
     deploy-k8s-cluster
 }

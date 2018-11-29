@@ -32,6 +32,9 @@ ANSIBLE_USER_DATA=""
 
 REPORT_FILE=""
 
+KUBERNETES_REMOTE=""
+KUBERNETES_COMMIT=""
+
 function read-config() {
     local config="$1"
 
@@ -61,6 +64,9 @@ function read-config() {
     ANSIBLE_USER_DATA=$(crudini --get $config ansible user-data)
 
     REPORT_FILE=$(crudini --get $config report file-path)
+
+    KUBERNETES_REMOTE=$(crudini --get $config kubernetes noremote)
+    KUBERNETES_COMMIT=$(crudini --get $config kubernetes commit)
 
     echo "CONFIG IS:"
     echo "----------------------------------------------"
@@ -115,11 +121,13 @@ function boot-instance () {
     nova boot --flavor $flavor --image $image --nic net-id=$NETWORK_INTERNAL --key $KEY_NAME --user-data $user_data $server > /dev/null
     while true; do
         stat=$(openstack server list | grep $server | awk '{print $6}')
-        if [[ ! $stat -eq ACTIVE ]]; then
+        if [[ ! "$stat" == "ACTIVE" ]]; then
             sleep 3
-        elif [[ $stat -eq ERROR ]]; then
+        elif [[ "$stat" == "ERROR" ]]; then
             echo "$server is in ERROR state."
             exit 1
+        else
+            break
         fi
     done
 }
@@ -186,6 +194,9 @@ function generate-report () {
     crudini --set $report windows passwords "${passwords[*]}"
 
     crudini --set $report linux ssh-key "~/id_rsa" # remote location of ssh key
+
+    crudini --set $report kubernetes noremote $KUBERNETES_REMOTE
+    crudini --set $report kubernetes commit $KUBERNETES_COMMIT
     IFS=$" "
 }
 

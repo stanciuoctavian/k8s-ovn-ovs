@@ -210,7 +210,7 @@ function prepare-ansible-node () {
 
     scp -i $PRIVATE_KEY $PRIVATE_KEY $ip:~/
     scp -i $PRIVATE_KEY $report $ip:~/
-    ssh -i $PRIVATE_KEY $ip "cat | bash /dev/stdin --report ~/$report" < ansible-script.sh
+    ssh -i $PRIVATE_KEY $ip "cat | bash /dev/stdin --report ~/$report_name" < ansible-script.sh
 }
 
 function prepare-tests () {

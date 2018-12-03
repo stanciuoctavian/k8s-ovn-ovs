@@ -99,6 +99,12 @@ function populate-ansible-hosts () {
     done
 }
 
+function enable-ansible-log () {
+    pushd ~/ovn-kubernetes/contrib
+        echo "log_path=/var/log/ansible.log" >> ansible.cfg
+    popd
+}
+
 function configure-linux-connection () {
     local file_master="$1"; shift
     local file_minions="$1"
@@ -179,13 +185,14 @@ function build-k8s-binaries () {
     popd
 
     pushd $GOPATH/src/k8s.io/kubernetes
-        newgrp docker
-        ./build/run.sh make WHAT="cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet cmd/kubectl cmd/kube-scheduler"
-        ./build/run.sh make WHAT="cmd/kubelet cmd/kubectl" KUBE_BUILD_PLATFORMS=windows/amd64
+        sudo ./build/run.sh make WHAT="cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet cmd/kubectl cmd/kube-scheduler"
+        sudo ./build/run.sh make WHAT="cmd/kubelet cmd/kubectl" KUBE_BUILD_PLATFORMS=windows/amd64
 
         mkdir -p ~/ovn-kubernetes/contrib/tmp
         cp _output/dockerized/bin/windows/amd64/*.exe  ~/ovn-kubernetes/contrib/tmp
         cp _output/dockerized/bin/linux/amd64/kube*  ~/ovn-kubernetes/contrib/tmp
+
+        sudo cp _output/dockerized/bin/linux/amd64/kubectl  /usr/bin
     popd
 }
 
@@ -200,7 +207,7 @@ function deploy-k8s-cluster () {
                 sleep 5
             fi
         done
-        sudo bash -c "ansible-playbook ovn-kubernetes-cluster.yml"
+        sudo bash -c "ansible-playbook ovn-kubernetes-cluster.yml -vv"
     popd
 }
 
@@ -226,6 +233,7 @@ function main () {
     clone-repo "https://github.com/papagalu/ovn-kubernetes.git" "./ovn-kubernetes"
     populate-etc-hosts
     populate-ansible-hosts "./ovn-kubernetes/contrib/inventory/hosts"
+    enable-ansible-log
     configure-linux-connection "./ovn-kubernetes/contrib/inventory/group_vars/kube-master" \
         "./ovn-kubernetes/contrib/inventory/group_vars/kube-minions-linux"
     create-windows-login-file

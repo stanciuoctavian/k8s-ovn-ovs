@@ -35,6 +35,9 @@ REPORT_FILE=""
 KUBERNETES_REMOTE=""
 KUBERNETES_COMMIT=""
 
+# TO DO (atuvenie) make this configurable
+LINUX_USER="ubuntu"
+
 function read-config() {
     local config="$1"
 
@@ -208,17 +211,17 @@ function prepare-ansible-node () {
     sleep 15 # sleep till node becomes available
     ssh-keyscan -H $ip >> ~/.ssh/known_hosts
 
-    scp -i $PRIVATE_KEY $PRIVATE_KEY $ip:~/
-    scp -i $PRIVATE_KEY $report $ip:~/
-    ssh -i $PRIVATE_KEY $ip "cat | bash /dev/stdin --report ~/$report_name" < ansible-script.sh
+    scp -i $PRIVATE_KEY $PRIVATE_KEY "${LINUX_USER}@${ip}:~/"
+    scp -i $PRIVATE_KEY $report "${LINUX_USER}@${ip}:~/"
+    ssh -i $PRIVATE_KEY "${LINUX_USER}@${ip}" "cat | bash /dev/stdin --report ~/$report_name" < ansible-script.sh
 }
 
 function prepare-tests () {
     local ansible_ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
     local master_ip=$(openstack server show ${LINUX_NODES[0]} | grep address | awk '{print $4}'); master_ip=${master_ip#*=}; master_ip=${master_ip%,}
 
-    scp -i $PRIVATE_KEY -r run-e2e/ $ansible_ip:~/
-    ssh -i $PRIVATE_KEY $ansible_ip "cat | bash /dev/stdin --k8s-master-ip $master_ip --id-rsa ~/id_rsa" < prepare-tests.sh
+    scp -i $PRIVATE_KEY -r run-e2e/ "${LINUX_USER}@${ansible_ip}:~/"
+    ssh -i $PRIVATE_KEY "${LINUX_USER}@${ansible_ip}" "cat | bash /dev/stdin --k8s-master-ip $master_ip --id-rsa ~/id_rsa" < prepare-tests.sh
 }
 
 function main() {

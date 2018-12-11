@@ -54,10 +54,9 @@ function set_job_results_paths() {
 	# Set local paths
 
 	BASE=$HOME/results
-
-	mkdir -p $BASE
-
 	ARTIFACTS="${BASE}/artifacts"
+	mkdir -p ${ARTIFACTS}
+
         BUILD_LOG="${BASE}/build-log.txt"
         FINISHED="${BASE}/finished.json"
         STARTED="${BASE}/started.json"

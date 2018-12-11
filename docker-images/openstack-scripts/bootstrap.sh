@@ -3,7 +3,6 @@
 # This script is responsable for creating the config.ini file with job specific params and pass it on to the
 # ./create-cluster.sh script
 
-set -x
 set -e
 
 CREATE_CLUSTER_REPO="http://github.com/e2e-win/k8s-ovn-ovs"
@@ -55,10 +54,9 @@ function set_job_results_paths() {
 	# Set local paths
 
 	BASE=$HOME/results
-
-	mkdir -p $BASE
-
 	ARTIFACTS="${BASE}/artifacts"
+	mkdir -p ${ARTIFACTS}
+
         BUILD_LOG="${BASE}/build-log.txt"
         FINISHED="${BASE}/finished.json"
         STARTED="${BASE}/started.json"
@@ -84,6 +82,8 @@ function start() {
 	local timestamp=`get_time`
 	local node_name=$DEFAULT_NODE_NAME
 
+	echo "Generating started.json. Start time: $timestamp"
+
 	jq -n --arg "timestamp" $timestamp --arg "node" $node_name -f /started_template.jq > ${STARTED}
 
 }
@@ -92,6 +92,8 @@ function finish() {
 
 	local timestamp=`get_time`
         local result=${RESULT:-DEFAULT_RESULT}
+
+	echo "Generating finished.json. Finish time: $timestamp"
 
         jq -n --arg "timestamp" $timestamp --arg "result" $result -f /finished_template.jq > ${FINISHED}
 
@@ -108,14 +110,19 @@ mkdir -p /root/.ssh
 touch /root/.ssh/known_hosts
 
 function clone-repo() {
+
 	REPO=$1
 	BRANCH=${2:-"master"}
+
+	echo "Cloning into repo ${REPO} , branhc ${BRANCH}"
 
 	git clone -b ${BRANCH} ${REPO}
 
 }
 
 function upload_results() {
+
+	echo "Uploading results to $REMOTE_BUILD_LOGS_FOLDER"
 
 	finish
 	gcloud_upload_folder ${BASE} ${REMOTE_BUILD_LOGS_FOLDER}
@@ -137,6 +144,9 @@ LINUX_MINION="${VM_PREFIX}-lin-minion"
 WIN_MINION1="${VM_PREFIX}-win1"
 WIN_MINION2="${VM_PREFIX}-win2"
 ANSIBLE_MASTER="${VM_PREFIX}-ansible"
+
+echo "Setting k8s-cluster.ini with job parameters."
+echo "Cluster vm prefix: ${VM_PREFIX}"
 
 crudini --set k8s-cluster.ini linux server-names "${LINUX_MASTER},${LINUX_MINION}"
 crudini --set k8s-cluster.ini linux user-data "./linux-user-data"
@@ -160,6 +170,8 @@ crudini --set k8s-cluster.ini keys name ${SSH_KEY_NAME}
 
 crudini --set k8s-cluster.ini kubernetes noremote kubernetes
 crudini --set k8s-cluster.ini kubernetes commit "v1.12.3"
+
+echo "Deploying cluster using k8s-cluster.ini."
 
 ./create-cluster.sh --config k8s-cluster.ini --clean --ansible --admin-openrc=$ADMIN_OPENRC
 

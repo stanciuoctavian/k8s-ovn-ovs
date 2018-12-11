@@ -1,11 +1,15 @@
 #!/bin/bash
 
 set -e
+set -x
 
 set -o pipefail
 
 declare -a WINDOWS_NODES
 declare -a LINUX_NODES
+
+CONFIG="/etc/k8s-ovn-ovs/config.ini"
+OPENSTACK_ADMIN="/etc/k8s-ovn-ovs/admin-openrc.sh"
 
 WINDOWS_USER_DATA=""
 LINUX_USER_DATA=""
@@ -27,6 +31,12 @@ ANSIBLE_SERVER=""
 ANSIBLE_USER_DATA=""
 
 REPORT_FILE=""
+
+KUBERNETES_REMOTE=""
+KUBERNETES_COMMIT=""
+
+# TO DO (atuvenie) make this configurable
+LINUX_USER="ubuntu"
 
 function read-config() {
     local config="$1"
@@ -58,6 +68,9 @@ function read-config() {
 
     REPORT_FILE=$(crudini --get $config report file-path)
 
+    KUBERNETES_REMOTE=$(crudini --get $config kubernetes noremote)
+    KUBERNETES_COMMIT=$(crudini --get $config kubernetes commit)
+
     echo "CONFIG IS:"
     echo "----------------------------------------------"
     echo "Windows nodes are:        ${WINDOWS_NODES[@]}"
@@ -78,9 +91,12 @@ function delete-instance () {
     local server="$1"
 
     echo "Now deleting : $server"
-    ip=$(openstack server show $server | grep address | awk '{print $5}')
-    openstack server delete "$server"
-    openstack floating ip delete $ip
+    exist=$(openstack server list | grep $server | wc -l) || true
+    if [[ ! $exist -eq 0 ]]; then
+        ip=$(openstack server show $server | grep address | awk '{print $5}')
+        openstack floating ip delete $ip || true
+        openstack server delete "$server"
+    fi
 }
 
 function delete-previous-cluster () {
@@ -106,8 +122,17 @@ function boot-instance () {
 
     echo "Now booting : $server"
     nova boot --flavor $flavor --image $image --nic net-id=$NETWORK_INTERNAL --key $KEY_NAME --user-data $user_data $server > /dev/null
-    ip=$(openstack floating ip create $NETWORK_EXTERNAL | grep " name " | awk '{print $4}')
-    openstack server add floating ip $server $ip
+    while true; do
+        stat=$(openstack server list | grep $server | awk '{print $6}')
+        if [[ ! "$stat" == "ACTIVE" ]]; then
+            sleep 3
+        elif [[ "$stat" == "ERROR" ]]; then
+            echo "$server is in ERROR state."
+            exit 1
+        else
+            break
+        fi
+    done
 }
 
 function boot-ansible () {
@@ -153,13 +178,13 @@ function generate-report () {
     declare -a passwords
 
     for server in ${WINDOWS_NODES[@]}; do
-        ip=$(openstack server show $server | grep address | awk '{print $5}')
+        ip=$(openstack server show $server | grep address | awk '{print $4}'); ip=${ip#*=}; ip=${ip%,}
         ips_windows+=($ip)
         pass=$(nova get-password $server $PRIVATE_KEY)
         passwords+=($pass)
     done
     for server in ${LINUX_NODES[@]}; do
-        ip=$(openstack server show $server | grep address | awk '{print $5}')
+        ip=$(openstack server show $server | grep address | awk '{print $4}'); ip=${ip#*=}; ip=${ip%,}
         ips_linux+=($ip)
     done
 
@@ -172,23 +197,35 @@ function generate-report () {
     crudini --set $report windows passwords "${passwords[*]}"
 
     crudini --set $report linux ssh-key "~/id_rsa" # remote location of ssh key
+
+    crudini --set $report kubernetes noremote $KUBERNETES_REMOTE
+    crudini --set $report kubernetes commit $KUBERNETES_COMMIT
     IFS=$" "
 }
 
 function prepare-ansible-node () {
     local report="$1";
+    local report_name=$(basename $report)
 
     local ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
     sleep 15 # sleep till node becomes available
     ssh-keyscan -H $ip >> ~/.ssh/known_hosts
 
-    scp -i $PRIVATE_KEY $PRIVATE_KEY $ip:~/
-    scp -i $PRIVATE_KEY $report $ip:~/
-    ssh -i $PRIVATE_KEY $ip "cat | bash /dev/stdin --report $report" < ansible-script.sh
+    scp -i $PRIVATE_KEY $PRIVATE_KEY "${LINUX_USER}@${ip}:~/"
+    scp -i $PRIVATE_KEY $report "${LINUX_USER}@${ip}:~/"
+    ssh -i $PRIVATE_KEY "${LINUX_USER}@${ip}" "cat | bash /dev/stdin --report ~/$report_name" < ansible-script.sh
+}
+
+function prepare-tests () {
+    local ansible_ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
+    local master_ip=$(openstack server show ${LINUX_NODES[0]} | grep address | awk '{print $4}'); master_ip=${master_ip#*=}; master_ip=${master_ip%,}
+
+    scp -i $PRIVATE_KEY -r run-e2e/ "${LINUX_USER}@${ansible_ip}:~/"
+    ssh -i $PRIVATE_KEY "${LINUX_USER}@${ansible_ip}" "cat | bash /dev/stdin --k8s-master-ip $master_ip --id-rsa ~/id_rsa" < prepare-tests.sh
 }
 
 function main() {
-    TEMP=$(getopt -o c:x::d::a:: --long config:,clean::,down::,ansible:: -n '' -- "$@")
+    TEMP=$(getopt -o c:x::d::a::b: --long config:,clean::,down::,ansible::,admin-openrc: -n '' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -199,13 +236,16 @@ function main() {
     while true ; do
         case "$1" in
             --config)
-                CONFIG="$2";           shift 2;;
+                CONFIG="$2";             shift 2;;
             --clean)
-                CLEAN="true";          shift 2;;
+                CLEAN="true";            shift 2;;
             --down)
-                DOWN="true";           shift 2;;
+                DOWN="true";             shift 2;;
             --ansible)
-                ANSIBLE_MASTER="true"; shift 2;;
+                ANSIBLE_MASTER="true";   shift 2;;
+            --admin-openrc)
+                OPENSTACK_ADMIN="$2"
+                source $OPENSTACK_ADMIN; shift 2;;
             --) shift ; break ;;
         esac
     done
@@ -217,13 +257,16 @@ function main() {
     fi
     if [[ $CLEAN == "true" ]]; then
         delete-previous-cluster
+        echo ""
     fi
     create-cluster
     wait-windows-nodes
     if [[ $ANSIBLE_MASTER == "true" ]]; then
         generate-report "$REPORT_FILE"
         prepare-ansible-node "$REPORT_FILE"
+        prepare-tests
     fi
+
 }
 
 main "$@"

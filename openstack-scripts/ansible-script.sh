@@ -61,9 +61,6 @@ function clone-repo () {
     echo "Cloning repo"
     if [[ ! -d "$destination" ]]; then
         git clone $repo "$destination"
-        pushd "$destination"
-            git checkout diff_download
-        popd
     fi
 }
  
@@ -232,7 +229,7 @@ function main () {
 
     wait-user-data
     read-report "$report"
-    clone-repo "https://github.com/papagalu/ovn-kubernetes.git" "./ovn-kubernetes"
+    clone-repo "https://github.com/openvswitch/ovn-kubernetes.git" "./ovn-kubernetes"
     populate-etc-hosts
     populate-ansible-hosts "./ovn-kubernetes/contrib/inventory/hosts"
     enable-ansible-log

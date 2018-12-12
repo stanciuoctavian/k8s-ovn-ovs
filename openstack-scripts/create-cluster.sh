@@ -221,7 +221,11 @@ function prepare-tests () {
 }
 
 function main() {
+
+    # make sure to keep env clean if anything breaks
+    trap delete-previous-cluster EXIT
     TEMP=$(getopt -o c:x::d::a::b: --long config:,down::,up::,test::,admin-openrc: -n '' -- "$@")
+
     if [[ $? -ne 0 ]]; then
         exit 1
     fi

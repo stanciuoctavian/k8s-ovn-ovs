@@ -114,7 +114,7 @@ function clone-repo() {
 	REPO=$1
 	BRANCH=${2:-"master"}
 
-	echo "Cloning into repo ${REPO} , branhc ${BRANCH}"
+	echo "Cloning into repo ${REPO} , branch ${BRANCH}"
 
 	git clone -b ${BRANCH} ${REPO}
 
@@ -134,7 +134,7 @@ trap upload_results EXIT
 start
 
 
-clone-repo $CREATE_CLUSTER_REPO "dev"
+clone-repo $CREATE_CLUSTER_REPO "dev_atuvenie"
 pushd k8s-ovn-ovs/openstack-scripts
 
 VM_PREFIX="${PROW_JOB_ID:-DEFAULT_PROW_JOB_ID}-${BUILD_ID:-DEFAULT_BUILD_ID}"
@@ -169,7 +169,7 @@ crudini --set k8s-cluster.ini keys private ${SSH_KEY}
 crudini --set k8s-cluster.ini keys name ${SSH_KEY_NAME}
 
 crudini --set k8s-cluster.ini kubernetes noremote kubernetes
-crudini --set k8s-cluster.ini kubernetes commit "v1.12.3"
+crudini --set k8s-cluster.ini kubernetes commit "master"
 
 echo "Deploying cluster using k8s-cluster.ini."
 

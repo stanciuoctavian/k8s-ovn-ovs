@@ -61,6 +61,10 @@ function clone-repo () {
     echo "Cloning repo"
     if [[ ! -d "$destination" ]]; then
         git clone $repo "$destination"
+        pushd $destination
+		echo "Checking out kube_cm_flag branch of adelina-t"
+		git checkout origin/remove_kube_cm_flag -b fix_branch
+	popd
     fi
 }
  
@@ -229,7 +233,7 @@ function main () {
 
     wait-user-data
     read-report "$report"
-    clone-repo "https://github.com/openvswitch/ovn-kubernetes.git" "./ovn-kubernetes"
+    clone-repo "https://github.com/adelina-t/ovn-kubernetes.git" "./ovn-kubernetes"
     populate-etc-hosts
     populate-ansible-hosts "./ovn-kubernetes/contrib/inventory/hosts"
     enable-ansible-log

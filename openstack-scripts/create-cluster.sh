@@ -225,6 +225,8 @@ function prepare-tests () {
 }
 
 function main() {
+    # make sure to keep env clean if anything breaks
+    trap delete-previous-cluster EXIT
     TEMP=$(getopt -o c:x::d::a::b: --long config:,clean::,down::,ansible::,admin-openrc: -n '' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1

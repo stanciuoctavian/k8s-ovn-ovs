@@ -57,7 +57,7 @@ function populate-kube-env () {
 
 function taint-node () {
     kubectl taint nodes $LINUX_NODE key=value:NoSchedule
-    kubectl label nodes linux1 node-role.kubernetes.io/master=NoSchedule
+    kubectl label nodes $LINUX_NODE node-role.kubernetes.io/master=NoSchedule
 }
 
 function start-tests () {

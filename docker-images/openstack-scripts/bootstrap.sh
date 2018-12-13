@@ -137,7 +137,7 @@ start
 clone-repo $CREATE_CLUSTER_REPO "dev"
 pushd k8s-ovn-ovs/openstack-scripts
 
-VM_PREFIX="${PROW_JOB_ID:-DEFAULT_PROW_JOB_ID}-${BUILD_ID:-DEFAULT_BUILD_ID}"
+VM_PREFIX=`echo "${PROW_JOB_ID:-DEFAULT_PROW_JOB_ID}" | cut -c1-8`
 
 LINUX_MASTER="${VM_PREFIX}-master"
 LINUX_MINION="${VM_PREFIX}-lin-minion"

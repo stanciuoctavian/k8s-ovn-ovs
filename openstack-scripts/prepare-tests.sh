@@ -68,12 +68,8 @@ function start-tests () {
         skip=$(cat skip | sed 's:\\\\:\\:g')
         mkdir -p results
         pushd ~/go/src/k8s.io/kubernetes
-            # apply custom commits
-            git remote add e2e-win https://github.com/e2e-win/kubernetes
-            git fetch e2e-win
-            git cherry-pick -n cb68f5ef9990dd93d6db719cd17ee8b7cbf2f5d4
 
-            kubetest --ginkgo-parallel=4 --verbose-commands=true --provider=local --test \
+            kubetest --ginkgo-parallel=4 --verbose-commands=true --provider=skeleton --test \
                 --test_args="--ginkgo.dryRun=false --ginkgo.focus=$focus --ginkgo.skip=$skip" --dump=~/run-e2e/results/ \
                 | tee ~/run-e2e/results/kubetest.log
         popd

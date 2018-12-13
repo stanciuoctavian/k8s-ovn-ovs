@@ -173,7 +173,7 @@ crudini --set k8s-cluster.ini kubernetes commit "v1.12.3"
 
 echo "Deploying cluster using k8s-cluster.ini."
 
-./create-cluster.sh --config k8s-cluster.ini --clean --ansible --admin-openrc=$ADMIN_OPENRC
+./create-cluster.sh --config k8s-cluster.ini --up --down --test --admin-openrc=$ADMIN_OPENRC
 
 if [[ ! ${PIPESTATUS[0]} -eq 0 ]]; then
 	RESULT="FAILURE"

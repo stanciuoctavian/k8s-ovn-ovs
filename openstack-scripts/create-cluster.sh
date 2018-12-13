@@ -222,8 +222,6 @@ function prepare-tests () {
 
 function main() {
 
-    # make sure to keep env clean if anything breaks
-    trap delete-previous-cluster EXIT
     TEMP=$(getopt -o c:x::d::a::b: --long config:,down::,up::,test::,admin-openrc: -n '' -- "$@")
 
     if [[ $? -ne 0 ]]; then
@@ -250,21 +248,28 @@ function main() {
         esac
     done
 
+    if [[ $DOWN == "true" ]]; then
+	# Only activate trap cluster-cleanup when down=true
+        trap delete-previous-cluster EXIT
+    fi
+
     read-config "$CONFIG"
     delete-previous-cluster
-    if [[ $DOWN == "true" ]]; then
-        exit 0
-    fi
     if [[ $UP == "true" ]]; then
         create-cluster
         wait-windows-nodes
         generate-report "$REPORT_FILE"
         prepare-ansible-node "$REPORT_FILE"
     fi
+
     if [[ $TEST == "true" ]]; then
         prepare-tests
     fi
 
+    if [[ $DOWN == "true" ]]; then
+       # TO DO ( atuvenie ): rename this to delete-cluster
+       delete-previous-cluster
+    fi
 }
 
 main "$@"

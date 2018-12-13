@@ -134,7 +134,7 @@ trap upload_results EXIT
 start
 
 
-clone-repo $CREATE_CLUSTER_REPO "dev"
+clone-repo $CREATE_CLUSTER_REPO
 pushd k8s-ovn-ovs/openstack-scripts
 
 VM_PREFIX=`echo "${PROW_JOB_ID:-DEFAULT_PROW_JOB_ID}" | cut -c1-8`

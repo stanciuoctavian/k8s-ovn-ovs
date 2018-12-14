@@ -69,7 +69,7 @@ function start-tests () {
         mkdir -p results
         pushd ~/go/src/k8s.io/kubernetes
 
-            kubetest --ginkgo-parallel=4 --verbose-commands=true --provider=skeleton --test \
+            kubetest --ginkgo-parallel=${GINKGO_PARALLEL} --verbose-commands=true --provider=skeleton --test \
                 --test_args="--ginkgo.dryRun=false --ginkgo.focus=$focus --ginkgo.skip=$skip" --dump=~/run-e2e/results/ \
                 | tee ~/run-e2e/results/kubetest.log
         popd

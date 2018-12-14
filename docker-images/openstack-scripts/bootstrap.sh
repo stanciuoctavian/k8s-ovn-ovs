@@ -12,6 +12,10 @@ DEFAULT_BUILD_ID="0000"
 DEFAULT_NODE_NAME="k8s-ovn-lin1"
 DEFAULT_RESULT="FAILURE"
 
+# test vars
+
+GINKGO_PARALLEL=${GINKGO_PARALLEL:-1}
+
 # setup log & artifacts collecting
 
 if [[ -z "${GCLOUD_SERVICE_ACCOUNT}" ]]; then
@@ -172,6 +176,8 @@ crudini --set k8s-cluster.ini kubernetes noremote kubernetes
 crudini --set k8s-cluster.ini kubernetes commit "v1.12.3"
 
 echo "Deploying cluster using k8s-cluster.ini."
+
+export GINKGO_PARALLEL=${GINKGO_PARALLEL}
 
 ./create-cluster.sh --config k8s-cluster.ini --up --down --test --admin-openrc=$ADMIN_OPENRC
 

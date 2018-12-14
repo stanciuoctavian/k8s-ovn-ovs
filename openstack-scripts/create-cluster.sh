@@ -9,6 +9,7 @@ declare -a LINUX_NODES
 
 CONFIG="/etc/k8s-ovn-ovs/config.ini"
 OPENSTACK_ADMIN="/etc/k8s-ovn-ovs/admin-openrc.sh"
+LOG_PATH="/tmp/k8s-logs"
 
 WINDOWS_USER_DATA=""
 LINUX_USER_DATA=""
@@ -219,9 +220,18 @@ function prepare-tests () {
     ssh -i $PRIVATE_KEY "${LINUX_USER}@${ansible_ip}" "cat | bash /dev/stdin --k8s-master-ip $master_ip --id-rsa ~/id_rsa --linux-node ${LINUX_NODES[1]}" < prepare-tests.sh
 }
 
+function collect-logs () {
+    # temp function that collect only logs from k8s tests
+    local ansible_ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
+    mkdir -p $LOG_PATH
+    pushd $LOG_PATH
+        scp -r -i $PRIVATE_KEY $ansible_ip:~/run-e2e/results .
+    popd
+}
+
 function main() {
 
-    TEMP=$(getopt -o c:x::d::a::b: --long config:,down::,up::,test::,admin-openrc: -n '' -- "$@")
+    TEMP=$(getopt -o c:d::u::t::l::b: --long config:,down::,up::,test::,log-path::,admin-openrc: -n '' -- "$@")
 
     if [[ $? -ne 0 ]]; then
         exit 1
@@ -240,6 +250,8 @@ function main() {
                 UP="true";               shift 2;;
             --test)
                 TEST="true";             shift 2;;
+            --log-path)
+                LOG_PATH="$2";           shift 2;;
             --admin-openrc)
                 OPENSTACK_ADMIN="$2"
                 source $OPENSTACK_ADMIN; shift 2;;
@@ -263,6 +275,7 @@ function main() {
 
     if [[ $TEST == "true" ]]; then
         prepare-tests
+        collect-logs
     fi
 
     if [[ $DOWN == "true" ]]; then

@@ -173,7 +173,7 @@ crudini --set k8s-cluster.ini keys private ${SSH_KEY}
 crudini --set k8s-cluster.ini keys name ${SSH_KEY_NAME}
 
 crudini --set k8s-cluster.ini kubernetes noremote kubernetes
-crudini --set k8s-cluster.ini kubernetes commit "v1.12.3"
+crudini --set k8s-cluster.ini kubernetes commit "master"
 
 echo "Deploying cluster using k8s-cluster.ini."
 

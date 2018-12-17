@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-
+set -x
 set -o pipefail
 
 declare -a WINDOWS_NODES
@@ -36,6 +36,10 @@ KUBERNETES_COMMIT=""
 
 # TO DO (atuvenie) make this configurable
 LINUX_USER="ubuntu"
+
+BASEDIR=$(dirname $0)
+
+. $BASEDIR/util.sh
 
 function read-config() {
     local config="$1"
@@ -146,7 +150,7 @@ function create-cluster () {
     for server in ${LINUX_NODES[@]}; do
         boot-instance $server "LINUX"
     done
-    boot-ansible
+    #boot-ansible
 }
 
 function wait-windows-nodes () {
@@ -215,8 +219,28 @@ function prepare-tests () {
     local ansible_ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
     local master_ip=$(openstack server show ${LINUX_NODES[0]} | grep address | awk '{print $4}'); master_ip=${master_ip#*=}; master_ip=${master_ip%,}
 
-    scp -i $PRIVATE_KEY -r run-e2e/ "${LINUX_USER}@${ansible_ip}:~/"
+    scp -i $PRIVATE_KEY -r "${BASEDIR}/run-e2e/" "${LINUX_USER}@${ansible_ip}:~/"
     ssh -i $PRIVATE_KEY "${LINUX_USER}@${ansible_ip}" "cat | bash /dev/stdin --k8s-master-ip $master_ip --id-rsa ~/id_rsa --linux-node ${LINUX_NODES[1]}" < prepare-tests.sh
+}
+
+function prepare-windows-nodes () {
+
+    # Prepare windows nodes for tests by:
+    # Prepulling all the images
+    # Creating c:\tmp & c:\tmp\home that tests expect
+
+    # Using extension from acs-engine CI
+
+    local REMOTE_SCRIPT="https://raw.githubusercontent.com/e2e-win/e2e-win-prow-deployment/master/extensions/agent_preprovision_extension/node_setup.ps1"
+    local WSMAN_CMD="'powershell.exe Start-BitsTransfer ${REMOTE_SCRIPT} -Destination prepare-node.ps1 ; .\prepare-node.ps1 '"
+
+    for server in ${WINDOWS_NODES[@]}; do
+        pass=$(nova get-password $server $PRIVATE_KEY)
+        username="Admin"
+        ip=$(openstack server show $server | grep address | awk '{print $4}'); ip=${ip#*=}; ip=${ip%,}
+        run_wsmancmd $ip $username $pass $WSMAN_CMD
+    done
+
 }
 
 function main() {
@@ -257,11 +281,13 @@ function main() {
     if [[ $UP == "true" ]]; then
         create-cluster
         wait-windows-nodes
-        generate-report "$REPORT_FILE"
-        prepare-ansible-node "$REPORT_FILE"
+        #generate-report "$REPORT_FILE"
+        #prepare-ansible-node "$REPORT_FILE"
     fi
 
     if [[ $TEST == "true" ]]; then
+        # TO DO ( atuvenie ): move prep of linux node ( taint ) to here
+        prepare-windows-nodes
         prepare-tests
     fi
 

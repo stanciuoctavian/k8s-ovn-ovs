@@ -199,7 +199,7 @@ function generate-report () {
 }
 
 function prepare-ansible-node () {
-    local report="$1";
+    local report="$1"
     local report_name=$(basename $report)
 
     local ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
@@ -212,11 +212,14 @@ function prepare-ansible-node () {
 }
 
 function prepare-tests () {
+    local report="$1"
+    local report_name=$(basename $report)
+
     local ansible_ip=$(openstack server show $ANSIBLE_SERVER | grep address | awk '{print $5}')
     local master_ip=$(openstack server show ${LINUX_NODES[0]} | grep address | awk '{print $4}'); master_ip=${master_ip#*=}; master_ip=${master_ip%,}
 
     scp -i $PRIVATE_KEY -r run-e2e/ "${LINUX_USER}@${ansible_ip}:~/"
-    ssh -i $PRIVATE_KEY "${LINUX_USER}@${ansible_ip}" "cat | bash /dev/stdin --k8s-master-ip $master_ip --id-rsa ~/id_rsa --linux-node ${LINUX_NODES[1]}" < prepare-tests.sh
+    ssh -i $PRIVATE_KEY "${LINUX_USER}@${ansible_ip}" "cat | bash /dev/stdin --report ~/$report_name --id-rsa ~/id_rsa" < prepare-tests.sh
 }
 
 function main() {
@@ -262,7 +265,7 @@ function main() {
     fi
 
     if [[ $TEST == "true" ]]; then
-        prepare-tests
+        prepare-tests "$REPORT_FILE"
     fi
 
     if [[ $DOWN == "true" ]]; then

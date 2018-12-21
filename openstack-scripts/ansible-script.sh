@@ -160,7 +160,7 @@ function install-docker () {
 }
 
 function build-k8s-binaries () {
-    set -x
+    echo "Building Kubernetes binaries"
     sudo apt-get install apache2 -y
 
     source ~/.bashrc
@@ -169,6 +169,7 @@ function build-k8s-binaries () {
     export GOPATH=/home/ubuntu/go
     export PATH=/home/ubuntu/bin:/usr/lib/go/bin:$PATH:/home/ubuntu/go/bin
 
+    echo "Cloning Kubernetes: ${KUBERNETES_REMOTE}-${KUBERNETES_COMMIT}"
     mkdir -p ~/go/src/k8s.io
     pushd ~/go/src/k8s.io
         if [[ ! -d kubernetes ]]; then
@@ -180,8 +181,8 @@ function build-k8s-binaries () {
     popd
 
     pushd $GOPATH/src/k8s.io/kubernetes
-        sudo ./build/run.sh make WHAT="cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet cmd/kubectl cmd/kube-scheduler"
-        sudo ./build/run.sh make WHAT="cmd/kubelet cmd/kubectl" KUBE_BUILD_PLATFORMS=windows/amd64
+        sudo ./build/run.sh make WHAT="cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet cmd/kubectl cmd/kube-scheduler" 1> /dev/null
+        sudo ./build/run.sh make WHAT="cmd/kubelet cmd/kubectl" KUBE_BUILD_PLATFORMS=windows/amd64 1> /dev/null
 
         mkdir -p ~/ovn-kubernetes/contrib/tmp
         cp _output/dockerized/bin/windows/amd64/*.exe  ~/ovn-kubernetes/contrib/tmp
@@ -192,7 +193,7 @@ function build-k8s-binaries () {
 }
 
 function deploy-k8s-cluster () {
-    echo "starting kubernetes deployment"
+    echo "Starting kubernetes deployment"
     sudo cp /home/ubuntu/id_rsa /root/
     pushd "ovn-kubernetes/contrib"
         while true; do
@@ -202,7 +203,7 @@ function deploy-k8s-cluster () {
                 sleep 5
             fi
         done
-        sudo bash -c "ansible-playbook ovn-kubernetes-cluster.yml -vv"
+        sudo bash -c "ansible-playbook ovn-kubernetes-cluster.yml -vv" 1> /dev/null
     popd
 }
 

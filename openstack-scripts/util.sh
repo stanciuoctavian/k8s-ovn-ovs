@@ -9,10 +9,10 @@ function join () {
 
 
 function run_ssh_cmd () {
-    local SSHUSER_HOST=$1
-    local SSHKEY=$2
-    local CMD=$3
-    ssh -t -o 'PasswordAuthentication no' -o 'StrictHostKeyChecking no' -o 'UserKnownHostsFile /dev/null' -i $SSHKEY $SSHUSER_HOST "$CMD" 2>&1
+    local SSHUSER_HOST="$1"; shift
+    local SSHKEY="$1";       shift
+
+    ssh -o 'PasswordAuthentication no' -o 'StrictHostKeyChecking no' -o 'UserKnownHostsFile /dev/null' -i $SSHKEY $SSHUSER_HOST "$@"
 }
 
 function upload_file_scp () {
@@ -32,7 +32,7 @@ function download_file_scp () {
     local SOURCE=$3
     local DESTINATION=$4
 
-    scp -r -o 'PasswordAuthentication no' -o 'StrictHostKeyChecking no' -o 'UserKnownHostsFile /dev/null' -i $SSHKEY $SSHUSER_HOST:$SOURCE $DESTINATION 2>&1
+    scp -r -o 'PasswordAuthentication no' -o 'StrictHostKeyChecking no' -o 'UserKnownHostsFile /dev/null' -i $SSHKEY $SSHUSER_HOST:"$SOURCE" "$DESTINATION" 2>&1
 }
 
 function ensure_remote_ssh_key () {

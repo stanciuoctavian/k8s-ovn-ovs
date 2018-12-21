@@ -257,7 +257,7 @@ function main() {
     if [[ $UP == "true" ]]; then
         create-cluster
         wait-windows-nodes
-        generate-report "$REPORT_FILE"
+        generate-report "$REPORT_FILE" 
         prepare-ansible-node "$REPORT_FILE"
     fi
 

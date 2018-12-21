@@ -179,7 +179,7 @@ echo "Deploying cluster using k8s-cluster.ini."
 
 export GINKGO_PARALLEL=${GINKGO_PARALLEL}
 
-./create-cluster.sh --config k8s-cluster.ini --up --down --test --admin-openrc=$ADMIN_OPENRC
+./create-cluster.sh --config k8s-cluster.ini --up --test --admin-openrc=$ADMIN_OPENRC
 
 if [[ ! ${PIPESTATUS[0]} -eq 0 ]]; then
 	RESULT="FAILURE"

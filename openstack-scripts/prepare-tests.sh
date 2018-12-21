@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -e
-set -x
 
 set -o pipefail
 
@@ -32,9 +31,11 @@ function program-is-installed () {
 }
 
 function build-k8s-parts () {
+    echo "Building Kubernetes"
     pushd ~/go/src/k8s.io/kubernetes
         git checkout master --force
-        sudo ./build/run.sh make WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/ginkgo"
+        # Building kubernetes produces lots of output. Only keep errors
+        sudo ./build/run.sh make WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/ginkgo" 1> /dev/null
     popd
 }
 
@@ -62,7 +63,6 @@ function taint-node () {
 
 function start-tests () {
     pushd run-e2e
-        set -x
         source kube-env
         focus=$(cat focus | sed 's:\\\\:\\:g')
         skip=$(cat skip | sed 's:\\\\:\\:g')

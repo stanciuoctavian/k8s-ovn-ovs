@@ -1,8 +1,10 @@
 
 import configargparse
 import ci_factory
+import logging
 
 p = configargparse.get_argument_parser()
+logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
 
 def parse_args():
 
@@ -31,7 +33,7 @@ def parse_args():
 def main():
     try:
         opts = parse_args()[0]
-        print opts
+        logging.info("Starting with CI: %s" % opts.ci)
         ci = ci_factory.get_ci(opts.ci)
         if opts.up == True:
             if opts.down == True:

@@ -1,6 +1,7 @@
 import ci
 import configargparse
 import openstack_wrap as openstack
+import logging
 
 p = configargparse.get_argument_parser()
 
@@ -39,7 +40,14 @@ class OVN_OVS_CI(ci.CI):
     def _get_windows_vms(self):
         return self.cluster.get("windowsVMs")
 
+    def _get_linux_vms(self):
+        return self.cluster.get("linuxVMs")
+
+    def _get_all_vms(self):
+        return self._get_linux_vms() + self._get_windows_vms()
+
     def _create_vms(self):
+        logging.info("Creating Openstack VMs")
         vmPrefix = self.opts.cluster_name
         for vm in self.opts.linuxVMs:
             openstack_vm = openstack.server_create("%s-%s" % (vmPrefix, vm), self.opts.linuxFlavor, self.opts.linuxImageID, 
@@ -53,11 +61,13 @@ class OVN_OVS_CI(ci.CI):
             fip = openstack.get_floating_ip(openstack.floating_ip_list()[0])
             openstack.server_add_floating_ip(openstack_vm['name'], fip)
             self._add_windows_vm(openstack_vm)
-        print self._get_windows_vms()
+        logging.info("Succesfuly created VMs %s" % [ vm.get("name") for vm in self._get_all_vms()])
 
     def _wait_for_windows_machines(self):
+        logging.info("Waiting for Windows VMs to obtain Admin password.")
         for vm in self._get_windows_vms():
             openstack.server_get_password(vm['name'], self.opts.keyName)
+            logging.info("Windows VM: %s succesfully obtained password." % vm.get("name"))
 
     def _prepare_env(self):
         self._create_vms()
@@ -71,12 +81,14 @@ class OVN_OVS_CI(ci.CI):
             openstack.server_delete("%s-%s" % (vmPrefix, vm))
 
     def up(self):
+        logging.info("OVN-OVS: Bringing cluster up.")
         try:
             self._prepare_env()
         except Exception as e:
             raise e
     
     def down(self):
+        logging.info("OVN-OVS: Destroying cluster.")
         try:
             self._destroy_cluster()
         except Exception as e:

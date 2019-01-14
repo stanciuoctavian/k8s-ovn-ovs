@@ -1,6 +1,6 @@
 
 import configargparse
-import ci as ci_system
+import ci_factory
 
 p = configargparse.get_argument_parser()
 
@@ -30,7 +30,7 @@ def parse_args():
 def main():
     try:
         opts = parse_args()[0]
-        ci = ci_system.CI()
+        ci = ci_factory.get_ci(opts.ci)
 
         if opts.up == True:
             if opts.down == True:

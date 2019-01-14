@@ -27,3 +27,4 @@ def run_cmd(cmd, timeout=50000, env=None, stdout=False, stderr=False):
         return stdout, stderr, proc.returncode
     finally:
         timer.cancel()
+    

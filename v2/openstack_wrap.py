@@ -43,13 +43,13 @@ def floating_ip_list(used=False):
     else:
         raise Exception("Failed to list floating ips with error %s." % err)
 
-def _get_floating_ip(floating_ip_obj):
+def get_floating_ip(floating_ip_obj):
     return floating_ip_obj["Floating IP Address"]
 
-def _get_floating_ip_fixed_address(floating_ip_obj):
+def get_floating_ip_fixed_address(floating_ip_obj):
     return floating_ip_obj["Fixed IP Address"]
 
-def _get_floating_ip_id(floating_ip_obj):
+def get_floating_ip_id(floating_ip_obj):
     return floating_ip_obj["ID"]
 
 def floating_ip_create(external_network_id):

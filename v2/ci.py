@@ -1,4 +1,4 @@
-class CI:
+class CI(object):
     def up(self):
         #pass
         print "UP: Default NOOP"

@@ -21,6 +21,7 @@ def parse_args():
     p.add('--admin-openrc', default=False, help='Openrc file for OpenStack cluster')
     p.add('--log-path', help='Path to place all artifacts')
     p.add('--ci', required=True, help="OVN-OVS, Flannel")
+    p.add('--cluster-name', required=True, help="Name of cluster.")
     
     opts = p.parse_known_args()
 
@@ -30,8 +31,8 @@ def parse_args():
 def main():
     try:
         opts = parse_args()[0]
+        print opts
         ci = ci_factory.get_ci(opts.ci)
-
         if opts.up == True:
             if opts.down == True:
                 ci.down()
@@ -41,10 +42,9 @@ def main():
         if opts.down == True:
             ci.down()
     except Exception as e:
-        raise e
-    finally:
+        print e
         if opts.down == True:
-            ci.down()    
+            ci.down() 
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,8 @@
 import utils
 import json
 import re
+import time
+from threading import Timer
 
 def server_create(name, flavor, imageID, networkID, keyName, userData):
     cmd = ("openstack server create --flavor=%(flavor)s --image=%(image)s --nic net-id=%(network)s "
@@ -77,3 +79,23 @@ def server_remove_floating_ip(server, ip):
     _, err, ret = utils.run_cmd(cmd, stderr=True)
     if ret != 0:
         raise Exception("Failed to remove floating ip %s for server %s with error %s" % (ip, server, err))
+
+def server_get_password(server, ssh_key):
+
+    cmd = ("nova get-password %s %s" % (server, ssh_key))
+    cmd = cmd.split()
+    tries = 60 # retrying for 600 seconds / 10 second sleep = 60 times. Windows machiens take a long time to get passwd 
+
+    passwd = ""
+    while passwd == "" and tries != 0:
+        tries = tries - 1
+        time.sleep(10)
+        out, err, ret = utils.run_cmd(cmd, stdout=True, stderr=True)
+        if ret == 0:
+            passwd=out.strip()
+        else:
+            raise Exception("Failed to get passwod for server %s with error %s" % (server, err))
+    if tries == 0:
+        raise Exception("Timed out waiting for nova password.")
+    return passwd
+

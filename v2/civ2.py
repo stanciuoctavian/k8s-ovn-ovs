@@ -2,6 +2,7 @@
 import configargparse
 import ci_factory
 import logging
+import utils
 
 p = configargparse.get_argument_parser()
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
@@ -21,9 +22,11 @@ def parse_args():
     p.add('--down', type=str2bool, default=False, help='Destroy cluster on finish.')
     p.add('--test', type=str2bool, default=False, help='Run tests.')
     p.add('--admin-openrc', default=False, help='Openrc file for OpenStack cluster')
-    p.add('--log-path', help='Path to place all artifacts')
+    p.add('--log-path', default="/tmp/civ2_logs", help='Path to place all artifacts')
     p.add('--ci', required=True, help="OVN-OVS, Flannel")
     p.add('--cluster-name', required=True, help="Name of cluster.")
+    p.add('--k8s-repo', default="http://github.com/kubernetes/kubernetes")
+    p.add('--k8s-branch', default="master")
     
     opts = p.parse_known_args()
 
@@ -34,7 +37,13 @@ def main():
     try:
         opts = parse_args()[0]
         logging.info("Starting with CI: %s" % opts.ci)
+        logging.info("Creating log dir: %s." % opts.log_path)
+        utils.mkdir_p(opts.log_path)
         ci = ci_factory.get_ci(opts.ci)
+
+        utils.get_k8s(repo=opts.k8s_repo, branch=opts.k8s_branch)
+        utils.build_k8s_binaries()
+
         if opts.up == True:
             if opts.down == True:
                 ci.down()

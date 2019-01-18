@@ -1,1 +1,0 @@
-{"timestamp":$timestamp , "node":$node }

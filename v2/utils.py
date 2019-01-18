@@ -79,3 +79,10 @@ def get_k8s(repo, branch):
     logging.info("Get Kubernetes.")
     k8s_path = get_k8s_folder()
     clone_repo(repo, branch, k8s_path)
+
+def download_file(url, dst):
+    cmd = ["wget", url, "-O", dst]
+    _, err, ret = run_cmd(cmd)
+
+    if ret != 0:
+        logging.error("Failed to download file: %s" % url)

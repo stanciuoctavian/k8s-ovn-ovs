@@ -4,8 +4,10 @@ import openstack_wrap as openstack
 import logging
 import utils
 import os
+import time
 import shutil
 import constants
+import yaml
 
 p = configargparse.get_argument_parser()
 
@@ -42,7 +44,10 @@ class OVN_OVS_CI(ci.CI):
     HOSTS_FILE="/etc/hosts"
     ANSIBLE_CONFIG_FILE="%s/contrib/ansible.cfg" % DEFAULT_ANSIBLE_PATH
 
-    def __init__(self):
+    KUBE_CONFIG_PATH="/root/.kube/config"
+    KUBE_TLS_SRC_PATH="/etc/kubernetes/tls/"
+
+    def __init__(self): 
         self.opts = p.parse_known_args()[0]
         self.cluster = {}
 
@@ -136,7 +141,10 @@ class OVN_OVS_CI(ci.CI):
         # Populate hosts file
         with open(OVN_OVS_CI.HOSTS_FILE,"a") as f:
             for vm in self._get_all_vms():
-                hosts_entry=("%s %s\n" % (self._get_vm_fip(vm), vm.get("name")))
+                vm_name =  vm.get("name")
+                if vm_name.find("master") > 0:
+                    vm_name = vm_name + " kubernetes"
+                hosts_entry=("%s %s\n" % (self._get_vm_fip(vm), vm_name))
                 logging.info("Adding entry %s to hosts file." % hosts_entry)
                 f.write(hosts_entry)
 
@@ -174,8 +182,59 @@ class OVN_OVS_CI(ci.CI):
             logging.error("Failed to deploy ansible-playbook with error: %s" % err)
             raise Exception("Failed to deploy ansible-playbook with error: %s" % err)
         logging.info("Succesfully deployed ansible-playbook.")
-        
-        
+
+
+    def _copyTo(self, src, dest, machine):
+        logging.info("Copying file %s to %s:%s." % (src, machine, dest))
+        cmd = "ansible --become --key-file=%(keyFile)s %(machineHostName)s -m copy" % {"keyFile": self.opts.keyFile,
+                                                                               "machineHostName": machine }
+        cmd = cmd.split()
+        cmd.append("-a")
+        cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
+        # Ansible logs everything to stdout
+        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
+        if ret != 0:
+            logging.error("Ansible failed to copy file to %s with error: %s" % (machine, out))
+            raise Exception("Ansible failed to copy file to %s with error: %s" % (machine, out))
+ 
+    def _copyFrom(self, src, dest, machine):
+        logging.info("Copying file %s:%s to %s." % (machine, src, dest))
+        cmd = "ansible --become --key-file=%(keyFile)s %(machineHostName)s -m fetch" % {"keyFile": self.opts.keyFile,
+                                                                              "machineHostName": machine }
+        cmd = cmd.split()
+        cmd.append("-a")
+        cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
+        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
+
+        if ret != 0:
+            logging.error("Ansible failed to fetch file from %s with error: %s" % (machine, out))
+            raise Exception("Ansible failed to fetch file from %s with error: %s" % (machine, out))
+   
+
+    def _prepareTestEnv(self):
+        # For OVN-OVS CI: copy config file from .kube folder of the master node
+        # Replace Server in config with dns-name for the machine
+        # Export appropriate env vars
+        linux_master = self._get_linux_vms()[0].get("name")
+
+        logging.info("Copying kubeconfig from master")
+        self._copyFrom("/root/.kube/config","/tmp/kubeconfig", linux_master)
+        self._copyFrom("/etc/kubernetes/tls/ca.pem","/etc/kubernetes/tls/ca.pem", linux_master)
+        self._copyFrom("/etc/kubernetes/tls/admin.pem","/etc/kubernetes/tls/admin.pem", linux_master)
+        self._copyFrom("/etc/kubernetes/tls/admin-key.pem","/etc/kubernetes/tls/admin-key.pem", linux_master)
+
+        with open("/tmp/kubeconfig") as f:
+            content = yaml.load(f)
+        for cluster in content["clusters"]:
+            cluster["cluster"]["server"] = "https://kubernetes"
+        with open("/tmp/kubeconfig", "w") as f:
+            yaml.dump(content, f)
+        os.environ["KUBE_MASTER"] = "local"
+        os.environ["KUBE_MASTER_IP"] = "kubernetes"
+        os.environ["KUBE_MASTER_URL"] = "https://kubernetes"
+        os.environ["KUBECONFIG"] = "/tmp/kubeconfig"
+
+
     def up(self):
         logging.info("OVN-OVS: Bringing cluster up.")
         try:

@@ -54,7 +54,7 @@ def main():
     cluster_name=get_cluster_name()
 
     cmd = ["python", "civ2.py"] + opts.job_args[1:]
-    cmd.append("--config-file=%s" % job_config_file)
+    cmd.append("--configfile=%s" % job_config_file)
     cmd.append("--cluster-name=%s" % cluster_name)
 
     subprocess.call(cmd, cwd=os.path.join(JOB_REPO_CLONE_DST,"v2"))

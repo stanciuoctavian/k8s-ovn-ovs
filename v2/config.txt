@@ -1,10 +1,10 @@
 [openstack]
-linuxVMs = [master, minion1]
+linuxVMs = [master, min1]
 linuxUserData = ./linux-user-data
 linuxFlavor = 6
 linuxImageID = xenial-20180831
 
-windowsVMs = [winminion1]
+windowsVMs = [win1, win2]
 windowsUserData = ./windows-user-data
 windowsFlavor = 6
 windowsImageID = windows-cb-fix-2

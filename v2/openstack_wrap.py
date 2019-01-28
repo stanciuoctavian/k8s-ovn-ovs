@@ -29,7 +29,6 @@ def server_create(name, flavor, imageID, networkID, keyName, userData):
     else:
         raise Exception("Failed to create server: %s with error: %s" % (name, err))
 
-
 def server_delete(server):
     # server = id or name of server
     # Should check it exists before trying to delete

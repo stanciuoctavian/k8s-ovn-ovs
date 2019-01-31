@@ -210,6 +210,35 @@ class OVN_OVS_CI(ci.CI):
             logging.error("Ansible failed to fetch file from %s with error: %s" % (machine, out))
             raise Exception("Ansible failed to fetch file from %s with error: %s" % (machine, out))
    
+    def _runRemoteCmd(self, command, machine, windows=False, root=False):
+        logging.info("Running cmd on remote machine %s." % (machine))
+        cmd=["ansible"]
+        if root:
+            cmd.append("--become")
+        if windows:
+            task = "win_shell"
+        else:
+            task = "shell"
+            cmd.append("--key-file=%s" % self.opts.keyFile)
+        cmd.append(machine)
+        cmd.append("-m")
+        cmd.append(task)
+        cmd.append('%s' % command)
+
+        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
+
+        if ret != 0:
+            logging.error("Ansible failed to run command %s on machine %s with error: %s" % (cmd, machine, out))
+            raise Exception("Ansible failed to run command %s on machine %s with error: %s" % (cmd, machine, out))
+
+    def _prepullImages(self):
+        # TO DO: This path should be passed as param
+        prepull_script="/tmp/k8s-ovn-ovs/v2/prepull.ps1"
+        for vm in self._get_windows_vms():
+            logging.info("Copying prepull script to node %s" % vm["name"])
+            self._copyTo(prepull_script, "c:\\", vm["name"])
+            self._runRemoteCmd("c:\prepull_script.ps1", vm["name"], windows=True)
+
 
     def _prepareTestEnv(self):
         # For OVN-OVS CI: copy config file from .kube folder of the master node

@@ -184,11 +184,16 @@ class OVN_OVS_CI(ci.CI):
         logging.info("Succesfully deployed ansible-playbook.")
 
 
-    def _copyTo(self, src, dest, machine):
+    def _copyTo(self, src, dest, machine, windows=False, root=False):
         logging.info("Copying file %s to %s:%s." % (src, machine, dest))
-        cmd = "ansible --become --key-file=%(keyFile)s %(machineHostName)s -m copy" % {"keyFile": self.opts.keyFile,
-                                                                               "machineHostName": machine }
-        cmd = cmd.split()
+        cmd = ["ansible"]
+        if root:
+            cmd.append("--become")
+        if not windows:
+            cmd.append("--key-file=%s" % self.opts.keyFile)
+        cmd.append(machine)
+        cmd.append("-m")
+        cmd.append("copy")
         cmd.append("-a")
         cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
         # Ansible logs everything to stdout
@@ -197,11 +202,16 @@ class OVN_OVS_CI(ci.CI):
             logging.error("Ansible failed to copy file to %s with error: %s" % (machine, out))
             raise Exception("Ansible failed to copy file to %s with error: %s" % (machine, out))
  
-    def _copyFrom(self, src, dest, machine):
+    def _copyFrom(self, src, dest, machine, windows=False, root=False):
         logging.info("Copying file %s:%s to %s." % (machine, src, dest))
-        cmd = "ansible --become --key-file=%(keyFile)s %(machineHostName)s -m fetch" % {"keyFile": self.opts.keyFile,
-                                                                              "machineHostName": machine }
-        cmd = cmd.split()
+        cmd = ["ansible"]
+        if root:
+            cmd.append("--become")
+        if not windows:
+            cmd.append("--key-file=%s" % self.opts.keyFile)
+        cmd.append(machine)
+        cmd.append("-m")
+        cmd.append("fetch")
         cmd.append("-a")
         cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
@@ -236,7 +246,7 @@ class OVN_OVS_CI(ci.CI):
         prepull_script="/tmp/k8s-ovn-ovs/v2/prepull.ps1"
         for vm in self._get_windows_vms():
             logging.info("Copying prepull script to node %s" % vm["name"])
-            self._copyTo(prepull_script, "c:\\", vm["name"])
+            self._copyTo(prepull_script, "c:\\", vm["name"], windows=True)
             self._runRemoteCmd("c:\prepull_script.ps1", vm["name"], windows=True)
 
 
@@ -247,10 +257,10 @@ class OVN_OVS_CI(ci.CI):
         linux_master = self._get_linux_vms()[0].get("name")
 
         logging.info("Copying kubeconfig from master")
-        self._copyFrom("/root/.kube/config","/tmp/kubeconfig", linux_master)
-        self._copyFrom("/etc/kubernetes/tls/ca.pem","/etc/kubernetes/tls/ca.pem", linux_master)
-        self._copyFrom("/etc/kubernetes/tls/admin.pem","/etc/kubernetes/tls/admin.pem", linux_master)
-        self._copyFrom("/etc/kubernetes/tls/admin-key.pem","/etc/kubernetes/tls/admin-key.pem", linux_master)
+        self._copyFrom("/root/.kube/config","/tmp/kubeconfig", linux_master, root=True)
+        self._copyFrom("/etc/kubernetes/tls/ca.pem","/etc/kubernetes/tls/ca.pem", linux_master, root=True)
+        self._copyFrom("/etc/kubernetes/tls/admin.pem","/etc/kubernetes/tls/admin.pem", linux_master, root=True)
+        self._copyFrom("/etc/kubernetes/tls/admin-key.pem","/etc/kubernetes/tls/admin-key.pem", linux_master, root=True)
 
         with open("/tmp/kubeconfig") as f:
             content = yaml.load(f)

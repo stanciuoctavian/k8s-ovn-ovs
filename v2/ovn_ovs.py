@@ -193,7 +193,8 @@ class OVN_OVS_CI(ci.CI):
             cmd.append("--key-file=%s" % self.opts.keyFile)
         cmd.append(machine)
         cmd.append("-m")
-        cmd.append("copy")
+        module = "win_copy" if windows else "copy"
+        cmd.append(module)
         cmd.append("-a")
         cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
         # Ansible logs everything to stdout

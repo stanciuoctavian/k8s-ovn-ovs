@@ -274,8 +274,10 @@ class OVN_OVS_CI(ci.CI):
         os.environ["KUBE_MASTER_URL"] = "https://kubernetes"
         os.environ["KUBECONFIG"] = "/tmp/kubeconfig"
 
-        self._prepullImages()
-
+        try:
+            self._prepullImages()
+        except:
+            time.sleep(1000000)
 
     def up(self):
         logging.info("OVN-OVS: Bringing cluster up.")

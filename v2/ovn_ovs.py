@@ -276,6 +276,10 @@ class OVN_OVS_CI(ci.CI):
         os.environ["KUBECONFIG"] = "/tmp/kubeconfig"
 
         try:
+            for vm in self._get_windows_vms():
+                openstack.reboot_server(vm["name"])
+            # Give the servers time to actually boot
+            time.sleep(120)
             self._prepullImages()
         except:
             time.sleep(1000000)

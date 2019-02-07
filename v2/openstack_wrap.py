@@ -43,6 +43,43 @@ def server_delete(server):
         raise Exception("Failed to delete server: %s with error: %s" % (server, err))
     logging.info("Succesfully deleted server: %s" % server)
 
+def server_status(server):
+    cmd = ("openstack server show %s -c status -f value" % server)
+    cmd = cmd.split()
+
+    out, err, ret = utils.run_cmd(cmd, stdout=True, stderr=True)
+
+    if ret != 0:
+        raise Exception("Failed to get status for server: %s %s" % (server, err))
+    return out.rstrip("\n")
+
+def wait_for_server_status(server, status):
+    while True:
+        logging.info("Waiting for server %s to reach status: %s" %(server, status))
+        s = server_status(server)
+        if s == status:
+            return
+        time.sleep(10)
+
+def reboot_server(server):
+    cmd = ("openstack server stop %s" % server)
+    cmd = cmd.split()
+
+    _, err, ret = utils.run_cmd(cmd, stderr=True)
+    if ret != 0:
+        raise Exception("Failed to stop server %s" % server)
+    wait_for_server_status(server, "SHUTOFF")
+
+    cmd = ("openstack server start %s" % server)
+    cmd = cmd.split()
+
+    _, err, ret = utils.run_cmd(cmd, stderr=True)
+    if ret != 0:
+        raise Exception("Failed to start server %s with error: %s" % (server, err))
+    
+    wait_for_server_status(server, "ACTIVE")
+
+
 def floating_ip_list(used=False):
     if used:
         status="ACTIVE"

@@ -93,6 +93,7 @@ class CI(object):
         cmd.append("--verbose-commands=true")
         cmd.append("--provider=skeleton")
         cmd.append("--test")
+        cmd.append("--dump=%s" % self.opts.log_path)
         cmd.append('--test_args=--ginkgo.noColor --ginkgo.dryRun=%(dryRun)s --node-os-distro=windows --ginkgo.focus=%(focus)s --ginkgo.skip=%(skip)s' % {
                                                                                                 "dryRun": self.opts.test_dry_run,
                                                                                                 "focus": self.opts.test_focus_regex,

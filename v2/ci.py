@@ -12,7 +12,7 @@ p.add("--repo-list", default="https://raw.githubusercontent.com/e2e-win/e2e-win-
 p.add("--parallel-test-nodes", default=1)
 p.add("--test-dry-run", default="False")
 p.add("--test-focus-regex", default="\\[Conformance\\]|\\[NodeConformance\\]|\\[sig-windows\\]")
-p.add("--test-skip-regex", default="")
+p.add("--test-skip-regex", default="\\[LinuxOnly\\]")
 
 class CI(object):
 

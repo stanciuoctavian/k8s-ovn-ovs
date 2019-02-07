@@ -249,7 +249,7 @@ class OVN_OVS_CI(ci.CI):
         for vm in self._get_windows_vms():
             logging.info("Copying prepull script to node %s" % vm["name"])
             self._copyTo(prepull_script, "c:\\", vm["name"], windows=True)
-            self._runRemoteCmd("c:\prepull.ps1", vm["name"], windows=True)
+            self._runRemoteCmd("c:\\prepull.ps1", vm["name"], windows=True)
 
 
     def _prepareTestEnv(self):

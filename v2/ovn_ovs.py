@@ -184,6 +184,18 @@ class OVN_OVS_CI(ci.CI):
         logging.info("Succesfully deployed ansible-playbook.")
 
 
+    def _waitForConnection(self, machine):
+        logging.info("Waiting for connection to machine %s.")
+        cmd = ["ansible"]
+        cmd.append(machine)
+        cmd.append("-m")
+        cmd.append("wait_for_connection")
+        cmd.append("-a")
+        cmd.append("'connect_timeout=5 sleep=5 timeout=360'")
+
+        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
+        return ret, out
+
     def _copyTo(self, src, dest, machine, windows=False, root=False):
         logging.info("Copying file %s to %s:%s." % (src, machine, dest))
         cmd = ["ansible"]
@@ -197,6 +209,12 @@ class OVN_OVS_CI(ci.CI):
         cmd.append(module)
         cmd.append("-a")
         cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
+
+        ret, _ = self._waitForConnection(machine)
+        if ret != 0:
+            logging.error("No connection to machine: %s", machine)
+            raise Exception("No connection to machine: %s", machine)
+
         # Ansible logs everything to stdout
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
         if ret != 0:
@@ -215,6 +233,13 @@ class OVN_OVS_CI(ci.CI):
         cmd.append("fetch")
         cmd.append("-a")
         cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
+
+        # TO DO: (atuvenie) This could really be a decorator
+        ret, _ = self._waitForConnection(machine)
+        if ret != 0:
+            logging.error("No connection to machine: %s", machine)
+            raise Exception("No connection to machine: %s", machine)
+
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
 
         if ret != 0:
@@ -236,6 +261,11 @@ class OVN_OVS_CI(ci.CI):
         cmd.append(task)
         cmd.append("-a")
         cmd.append("'%s'" % command)
+
+        ret, _ = self._waitForConnection(machine)
+        if ret != 0:
+            logging.error("No connection to machine: %s", machine)
+            raise Exception("No connection to machine: %s", machine)
 
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
 
@@ -278,8 +308,6 @@ class OVN_OVS_CI(ci.CI):
         try:
             for vm in self._get_windows_vms():
                 openstack.reboot_server(vm["name"])
-            # Give the servers time to actually boot
-            time.sleep(120)
             self._prepullImages()
         except:
             time.sleep(1000000)

@@ -1,9 +1,11 @@
 import ci
 import ovn_ovs
+import flannel
 
 
 CI_MAP = {
-    "ovn-ovs": ovn_ovs.OVN_OVS_CI
+    "ovn-ovs": ovn_ovs.OVN_OVS_CI,
+    "flannel": flannel.Flannel_CI
 }
 
 def get_ci(name):

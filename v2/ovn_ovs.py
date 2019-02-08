@@ -235,7 +235,7 @@ class OVN_OVS_CI(ci.CI):
         cmd.append("-m")
         cmd.append(task)
         cmd.append("-a")
-        cmd.append('%s' % command)
+        cmd.append("'%s'" % command)
 
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
 

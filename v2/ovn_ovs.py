@@ -321,6 +321,11 @@ class OVN_OVS_CI(ci.CI):
         except Exception as e:
             raise e
     
+    def build(self):
+        logging.info("OVN-OVS: Building k8s binaries.")
+        utils.get_k8s(repo=self.opts.k8s_repo, branch=self.opts.k8s_branch)
+        utils.build_k8s_binaries()
+
     def down(self):
         logging.info("OVN-OVS: Destroying cluster.")
         try:

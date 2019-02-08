@@ -23,6 +23,9 @@ class CI(object):
         #pass
         logging.info("UP: Default NOOP")
 
+    def build(self):
+        logging.info("BUILD: Default NOOP")
+
     def down(self):
        #pass
         logging.info("DOWN: Default NOOP")

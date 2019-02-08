@@ -20,6 +20,7 @@ def parse_args():
     p.add('-c', '--configfile', is_config_file=True, help='Config file path.')
     p.add('--up', type=str2bool, default=False, help='Deploy test cluster.')
     p.add('--down', type=str2bool, default=False, help='Destroy cluster on finish.')
+    p.add('--build', type=str2bool, default=True, help='Build k8s binaries.')
     p.add('--test', type=str2bool, default=False, help='Run tests.')
     p.add('--admin-openrc', default=False, help='Openrc file for OpenStack cluster')
     p.add('--log-path', default="/tmp/civ2_logs", help='Path to place all artifacts')
@@ -41,8 +42,8 @@ def main():
         utils.mkdir_p(opts.log_path)
         ci = ci_factory.get_ci(opts.ci)
 
-        utils.get_k8s(repo=opts.k8s_repo, branch=opts.k8s_branch)
-        utils.build_k8s_binaries()
+        if opts.build:
+            ci.build()
 
         if opts.up == True:
             if opts.down == True:

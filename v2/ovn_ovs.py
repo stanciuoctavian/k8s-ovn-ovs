@@ -176,18 +176,20 @@ class OVN_OVS_CI(ci.CI):
         cmd = cmd.split()
         cmd.append("--key-file=%s" % self.opts.keyFile)
 
-        _, err ,ret = utils.run_cmd(cmd, stderr=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH)
+        out, _ ,ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH)
 
         if ret != 0:
-            logging.error("Failed to deploy ansible-playbook with error: %s" % err)
-            raise Exception("Failed to deploy ansible-playbook with error: %s" % err)
+            logging.error("Failed to deploy ansible-playbook with error: %s" % out)
+            raise Exception("Failed to deploy ansible-playbook with error: %s" % out)
         logging.info("Succesfully deployed ansible-playbook.")
 
 
-    def _waitForConnection(self, machine):
-        logging.info("Waiting for connection to machine %s.")
+    def _waitForConnection(self, machine, windows):
+        logging.info("Waiting for connection to machine %s." % machine)
         cmd = ["ansible"]
         cmd.append(machine)
+        if not windows:
+            cmd.append("--key-file=%s" % self.opts.keyFile)
         cmd.append("-m")
         cmd.append("wait_for_connection")
         cmd.append("-a")
@@ -210,7 +212,7 @@ class OVN_OVS_CI(ci.CI):
         cmd.append("-a")
         cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
 
-        ret, _ = self._waitForConnection(machine)
+        ret, _ = self._waitForConnection(machine, windows=windows)
         if ret != 0:
             logging.error("No connection to machine: %s", machine)
             raise Exception("No connection to machine: %s", machine)
@@ -235,7 +237,7 @@ class OVN_OVS_CI(ci.CI):
         cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
 
         # TO DO: (atuvenie) This could really be a decorator
-        ret, _ = self._waitForConnection(machine)
+        ret, _ = self._waitForConnection(machine, windows=windows)
         if ret != 0:
             logging.error("No connection to machine: %s", machine)
             raise Exception("No connection to machine: %s", machine)
@@ -262,7 +264,7 @@ class OVN_OVS_CI(ci.CI):
         cmd.append("-a")
         cmd.append("'%s'" % command)
 
-        ret, _ = self._waitForConnection(machine)
+        ret, _ = self._waitForConnection(machine, windows=windows)
         if ret != 0:
             logging.error("No connection to machine: %s", machine)
             raise Exception("No connection to machine: %s", machine)

@@ -24,8 +24,8 @@ def parse_args():
     p.add('--test', type=str2bool, default=False, help='Run tests.')
     p.add('--admin-openrc', default=False, help='Openrc file for OpenStack cluster')
     p.add('--log-path', default="/tmp/civ2_logs", help='Path to place all artifacts')
-    p.add('--ci', required=True, help="OVN-OVS, Flannel")
-    p.add('--cluster-name', required=True, help="Name of cluster.")
+    p.add('--ci', help="OVN-OVS, Flannel")
+    p.add('--cluster-name', help="Name of cluster.")
     p.add('--k8s-repo', default="http://github.com/kubernetes/kubernetes")
     p.add('--k8s-branch', default="master")
     
@@ -41,6 +41,7 @@ def main():
         logging.info("Creating log dir: %s." % opts.log_path)
         utils.mkdir_p(opts.log_path)
         ci = ci_factory.get_ci(opts.ci)
+        print opts
 
         if opts.build:
             ci.build()

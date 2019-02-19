@@ -1,10 +1,9 @@
 IMG = e2eteam/k8s-ovn-ovs-ci
-TAG = latest
+TAG = dev-v2
 
 all: build
 
 build:
-	@echo Hello World
 	@echo Build $(IMG):$(TAG)
 	docker build -t $(IMG):$(TAG) .
 

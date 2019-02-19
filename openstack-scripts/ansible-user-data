@@ -1,7 +1,0 @@
-#!/bin/bash
-
-sudo apt-get update && sudo apt-get upgrade -y
-sudo apt-add-repository ppa:ansible/ansible -y
-sudo apt-get update
-sudo apt-get install software-properties-common python python-pip ansible crudini -y
-sudo pip install pywinrm

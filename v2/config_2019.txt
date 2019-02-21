@@ -7,7 +7,7 @@ linuxImageID = xenial-20180831
 windowsVMs = [win1, win2]
 windowsUserData = ./windows-user-data
 windowsFlavor = 6
-windowsImageID = windows-2019-hyper-v
+windowsImageID = windows-2019-hyper-v-20.02.18
 
 keyName = papagalu
 

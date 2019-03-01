@@ -160,12 +160,12 @@ class OVN_OVS_CI(ci.CI):
         full_ansible_tmp_path = os.path.join(OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, "tmp")
         utils.mkdir_p(full_ansible_tmp_path)
         # Copy kubernetes prebuilt binaries
-        for file in ["kubelet","kubectl","kube-apiserver","kube-controller-manager","kube-scheduler"]:
+        for file in ["kubelet","kubectl","kube-apiserver","kube-controller-manager","kube-scheduler","kube-proxy"]:
             full_file_path = os.path.join(utils.get_k8s_folder(), constants.KUBERNETES_LINUX_BINS_LOCATION, file)
             logging.info("Copying %s to %s." % (full_file_path, full_ansible_tmp_path))
             shutil.copy(full_file_path, full_ansible_tmp_path)
 
-        for file in ["kubelet.exe", "kubectl.exe"]:
+        for file in ["kubelet.exe", "kubectl.exe", "kube-proxy.exe"]:
             full_file_path = os.path.join(utils.get_k8s_folder(), constants.KUBERNETES_WINDOWS_BINS_LOCATION, file)
             logging.info("Copying %s to %s." % (full_file_path, full_ansible_tmp_path))
             shutil.copy(full_file_path, full_ansible_tmp_path)

@@ -34,7 +34,7 @@ class OVN_OVS_CI(ci.CI):
 
     DEFAULT_ANSIBLE_PATH="/tmp/ovn-kubernetes"
     ANSIBLE_PLAYBOOK="ovn-kubernetes-cluster.yaml"
-    ANSIBLE_CONTRIB_PATH="%s/contrib" % DEFAULT_ANSIBLE_PATH
+    ANSIBLE_PLAYBOOK_ROOT="%s/contrib" % DEFAULT_ANSIBLE_PATH
     ANSIBLE_HOSTS_TEMPLATE=("[kube-master]\nKUBE_MASTER_PLACEHOLDER\n\n[kube-minions-linux]\nKUBE_MINIONS_LINUX_PLACEHOLDER\n\n"
                             "[kube-minions-windows]\nKUBE_MINIONS_WINDOWS_PLACEHOLDER\n")
     ANSIBLE_HOSTS_PATH="%s/contrib/inventory/hosts" % DEFAULT_ANSIBLE_PATH
@@ -50,6 +50,16 @@ class OVN_OVS_CI(ci.CI):
     def __init__(self): 
         self.opts = p.parse_known_args()[0]
         self.cluster = {}
+        self.default_ansible_path = OVN_OVS_CI.DEFAULT_ANSIBLE_PATH
+        self.ansible_playbook = OVN_OVS_CI.ANSIBLE_PLAYBOOK
+        self.ansible_playbook_root = OVN_OVS_CI.ANSIBLE_PLAYBOOK_ROOT
+        self.ansible_hosts_template = OVN_OVS_CI.ANSIBLE_HOSTS_TEMPLATE
+        self.ansible_hosts_path = OVN_OVS_CI.ANSIBLE_HOSTS_PATH
+        self.ansible_windows_admin = OVN_OVS_CI.DEFAULT_ANSIBLE_WINDOWS_ADMIN
+        self.ansible_host_var_windows_template = OVN_OVS_CI.DEFAULT_ANSIBLE_HOST_VAR_WINDOWS_TEMPLATE
+        self.ansible_host_var_dir = OVN_OVS_CI.DEFAULT_ANSIBLE_HOST_VAR_DIR
+        self.ansible_config_file = OVN_OVS_CI.ANSIBLE_CONFIG_FILE
+
 
     def _add_linux_vm(self, vm_obj):
         if self.cluster.get("linuxVMs") == None:
@@ -113,28 +123,28 @@ class OVN_OVS_CI(ci.CI):
             openstack.server_delete("%s-%s" % (vmPrefix, vm))
 
     def _prepare_ansible(self):
-        utils.clone_repo(self.opts.ansibleRepo, self.opts.ansibleBranch, OVN_OVS_CI.DEFAULT_ANSIBLE_PATH)
+        utils.clone_repo(self.opts.ansibleRepo, self.opts.ansibleBranch, self.default_ansible_path)
         
         # Creating ansible hosts file
         linux_master = self._get_linux_vms()[0].get("name")
         linux_minions = [vm.get("name") for vm in self._get_linux_vms()[1:]]
         windows_minions = [vm.get("name") for vm in self._get_windows_vms()]
 
-        hosts_file_content = OVN_OVS_CI.ANSIBLE_HOSTS_TEMPLATE.replace("KUBE_MASTER_PLACEHOLDER", linux_master)
+        hosts_file_content = self.ansible_hosts_template.replace("KUBE_MASTER_PLACEHOLDER", linux_master)
         hosts_file_content = hosts_file_content.replace("KUBE_MINIONS_LINUX_PLACEHOLDER", "\n".join(linux_minions))
         hosts_file_content = hosts_file_content.replace("KUBE_MINIONS_WINDOWS_PLACEHOLDER","\n".join(windows_minions))
 
         logging.info("Writing hosts file for ansible inventory.")
-        with open(OVN_OVS_CI.ANSIBLE_HOSTS_PATH, "w") as f:
+        with open(self.ansible_hosts_path, "w") as f:
             f.write(hosts_file_content)
 
         # Creating hosts_vars for hosts
         for vm in self._get_windows_vms():
             vm_name = vm.get("name")
-            vm_username = OVN_OVS_CI.DEFAULT_ANSIBLE_WINDOWS_ADMIN # TO DO: Have this configurable trough opts
+            vm_username = self.ansible_windows_admin # TO DO: Have this configurable trough opts
             vm_pass = openstack.server_get_password(vm_name, self.opts.keyFile)
-            hosts_var_content = OVN_OVS_CI.DEFAULT_ANSIBLE_HOST_VAR_WINDOWS_TEMPLATE.replace("USERNAME_PLACEHOLDER", vm_username).replace("PASS_PLACEHOLDER", vm_pass)
-            filepath = os.path.join(OVN_OVS_CI.DEFAULT_ANSIBLE_HOST_VAR_DIR, vm_name)
+            hosts_var_content = self.ansible_host_var_windows_template.replace("USERNAME_PLACEHOLDER", vm_username).replace("PASS_PLACEHOLDER", vm_pass)
+            filepath = os.path.join(self.ansible_host_var_dir, vm_name)
             with open(filepath, "w") as f:
                 f.write(hosts_var_content)
 
@@ -149,7 +159,7 @@ class OVN_OVS_CI(ci.CI):
                 f.write(hosts_entry)
 
         # Enable ansible log and set ssh options
-        with open(OVN_OVS_CI.ANSIBLE_CONFIG_FILE, "a") as f:
+        with open(self.ansible_config_file, "a") as f:
             log_file = os.path.join(self.opts.log_path, "ansible-deploy.log")
             log_config = "log_path=%s\n" % log_file
             # This probably goes better in /etc/ansible.cfg (set in dockerfile )
@@ -157,7 +167,7 @@ class OVN_OVS_CI(ci.CI):
             f.write(log_config) 
             f.write(ansible_config)
 
-        full_ansible_tmp_path = os.path.join(OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, "tmp")
+        full_ansible_tmp_path = os.path.join(self.ansible_playbook_root, "tmp")
         utils.mkdir_p(full_ansible_tmp_path)
         # Copy kubernetes prebuilt binaries
         for file in ["kubelet","kubectl","kube-apiserver","kube-controller-manager","kube-scheduler","kube-proxy"]:
@@ -172,11 +182,11 @@ class OVN_OVS_CI(ci.CI):
 
     def _deploy_ansible(self):
         logging.info("Starting Ansible deployment.")
-        cmd = "ansible-playbook ovn-kubernetes-cluster.yml -v"
+        cmd = "ansible-playbook %s -v" % self.ansible_playbook
         cmd = cmd.split()
         cmd.append("--key-file=%s" % self.opts.keyFile)
 
-        out, _ ,ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH)
+        out, _ ,ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root)
 
         if ret != 0:
             logging.error("Failed to deploy ansible-playbook with error: %s" % out)
@@ -195,7 +205,7 @@ class OVN_OVS_CI(ci.CI):
         cmd.append("-a")
         cmd.append("'connect_timeout=5 sleep=5 timeout=360'")
 
-        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
+        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
         return ret, out
 
     def _copyTo(self, src, dest, machine, windows=False, root=False):
@@ -218,7 +228,7 @@ class OVN_OVS_CI(ci.CI):
             raise Exception("No connection to machine: %s", machine)
 
         # Ansible logs everything to stdout
-        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
+        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
         if ret != 0:
             logging.error("Ansible failed to copy file to %s with error: %s" % (machine, out))
             raise Exception("Ansible failed to copy file to %s with error: %s" % (machine, out))
@@ -242,7 +252,7 @@ class OVN_OVS_CI(ci.CI):
             logging.error("No connection to machine: %s", machine)
             raise Exception("No connection to machine: %s", machine)
 
-        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
+        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
 
         if ret != 0:
             logging.error("Ansible failed to fetch file from %s with error: %s" % (machine, out))
@@ -269,7 +279,7 @@ class OVN_OVS_CI(ci.CI):
             logging.error("No connection to machine: %s", machine)
             raise Exception("No connection to machine: %s", machine)
 
-        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=OVN_OVS_CI.ANSIBLE_CONTRIB_PATH, shell=True)
+        out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
 
         if ret != 0:
             logging.error("Ansible failed to run command %s on machine %s with error: %s" % (cmd, machine, out))

@@ -58,7 +58,7 @@ def build_k8s_binaries(k8s_path=None):
     k8s_path = k8s_path if k8s_path else get_k8s_folder()
     logging.info("Building K8s Binaries:")
     logging.info("Build k8s linux binaries.")
-    cmd = ["make", 'WHAT="cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet cmd/kubectl cmd/kube-scheduler"']
+    cmd = ["make", 'WHAT="cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet cmd/kubectl cmd/kube-scheduler cmd/kube-proxy"']
     
     _, err, ret = run_cmd(cmd, stderr=True, cwd=k8s_path, shell=True)
 
@@ -66,7 +66,7 @@ def build_k8s_binaries(k8s_path=None):
         logging.error("Failed to build k8s linux binaries with error: %s" % err)
         raise Exception("Failed to build k8s linux binaries with error: %s" % err)
     
-    cmd = ["make", 'WHAT="cmd/kubelet cmd/kubectl"', "KUBE_BUILD_PLATFORMS=windows/amd64"]
+    cmd = ["make", 'WHAT="cmd/kubelet cmd/kubectl cmd/kube-proxy"', "KUBE_BUILD_PLATFORMS=windows/amd64"]
 
     _, err, ret = run_cmd(cmd, stderr=True, cwd=k8s_path, shell=True)
     if ret != 0:

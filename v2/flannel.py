@@ -4,7 +4,7 @@ import time
 class Flannel_CI(ovn_ovs.OVN_OVS_CI):
 
     DEFAULT_ANSIBLE_PATH="/tmp/flannel-kubernetes"
-    ANSIBLE_PLAYBOOK="kubernetes-cluster.yaml"
+    ANSIBLE_PLAYBOOK="kubernetes-cluster.yml"
     ANSIBLE_PLAYBOOK_ROOT=DEFAULT_ANSIBLE_PATH
     ANSIBLE_HOSTS_TEMPLATE=("[kube-master]\nKUBE_MASTER_PLACEHOLDER\n\n[kube-minions-linux]\nKUBE_MINIONS_LINUX_PLACEHOLDER\n\n"
                             "[kube-minions-windows]\nKUBE_MINIONS_WINDOWS_PLACEHOLDER\n")

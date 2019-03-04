@@ -41,7 +41,7 @@ def main():
         logging.info("Creating log dir: %s." % opts.log_path)
         utils.mkdir_p(opts.log_path)
         ci = ci_factory.get_ci(opts.ci)
-        print opts
+        success = 0
 
         if opts.build:
             ci.build()
@@ -51,9 +51,10 @@ def main():
                 ci.down()
             ci.up()
         if opts.test == True:
-            ci.test()
+            success = ci.test()
         if opts.down == True:
             ci.down()
+        return success
     except Exception as e:
         print e
         if opts.down == True:

@@ -141,14 +141,38 @@ def create_log_paths(log_path, remote_base):
     mkdir_p(artifacts_path)
     job_name = os.environ.get("JOB_NAME", "defaultjob")
     build_id = os.environ.get("BUILD_ID", "0000-0000-0000-0000")
+    remote_job_path = os.path.join(remote_base, job_name)
+    remote_build_path = os.path.join(remote_job_path, build_id)
     paths = {
         "build_log": os.path.join(log_path, "build-log.txt"),
+        "remote_build_log": os.path.join(remote_build_path, "build-log.txt"),
         "artifacts": artifacts_path,
+        "remote_artifacts_path": os.path.join(remote_build_path, "artifacts"),
         "finished": os.path.join(log_path, "finished.json"),
         "started": os.path.join(log_path, "started.json"),
-        "remote_job_path": os.path.join(remote_base, job_name, build_id)
+        "remote_build_path": remote_build_path,
+        "remote_started": os.path.join(remote_build_path, "started.json"),
+        "remote_finished": os.path.join(remote_build_path, "finished.json"),
+        "remote_latest_build": os.path.join(remote_job_path, "latest-build.txt"),
+        "latest_build": os.path.join("/tmp", "latest-build.txt")
+
     }
     return paths
+
+def upload_file(local, remote):
+    cmd = "gsutil -q cp %s %s" % (local, remote)
+    cmd = cmd.split()
+    call(cmd)
+
+def upload_artifacts(local, remote):
+    cmd = "gsutil -q cp -r %s %s" % (local, remote)
+    cmd = cmd.split()
+    call(cmd)
+
+def create_latest_build(path):
+    latest_build = os.environ.get("BUILD_ID", "0000-0000-0000-0000")
+    with open(path, "w") as f:
+        f.write(latest_build)
 
 def create_started(path):
     data = {
@@ -168,11 +192,6 @@ def create_finished(path, success=True, meta=None):
     with open(path, "w") as f:
         json.dump(data, f)
 
-def upload_artifacts(local, remote):
-    cmd = "gsutil -q cp -r %s/* %s" % (local, remote)
-    cmd = cmd.split()
-    call(cmd)
-
 
 def main():
 
@@ -185,9 +204,12 @@ def main():
 
     time.sleep(200) # Give the container a chance to get DNS
     try:
-        create_started(log_paths["started"])
-
         gcloud_login(opts.service_account)
+
+        create_started(log_paths["started"])
+        upload_file(log_paths["started"], log_paths["remote_started"])
+
+        create_latest_build(log_paths["latest_build"])
 
         logger.info("Clonning job repo: %s on branch %s." % (opts.job_repo, opts.job_branch))
         clone_repo(opts.job_repo, opts.job_branch, JOB_REPO_CLONE_DST)
@@ -206,7 +228,10 @@ def main():
         success = False
     finally:
         create_finished(log_paths["finished"], success)
-        upload_artifacts(opts.log_path, log_paths["remote_job_path"])
+        upload_file(log_paths["finished"], log_paths["remote_finished"])
+        upload_file(log_paths["build_log"], log_paths["remote_build_log"])
+        upload_artifacts(log_paths["artifacts"], log_paths["remote_artifacts_path"])
+        upload_file(log_paths["latest_build"], log_paths["remote_latest_build"])
     
 if __name__ == "__main__":
     main()

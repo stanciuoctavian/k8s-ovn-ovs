@@ -107,4 +107,6 @@ class CI(object):
     def test(self):
         self._prepareTestEnv()
         self._prepareTests()
-        self._runTests()
+        ret = self._runTests()
+        if ret != 0:
+            return ret

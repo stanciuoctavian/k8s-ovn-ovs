@@ -1,6 +1,6 @@
-import logging
+import log
 import utils
-import logging
+import log
 import os
 import configargparse
 import subprocess
@@ -18,17 +18,18 @@ class CI(object):
 
     def __init__(self):
         self.opts = p.parse_known_args()[0]
+        self.logging = log.getLogger(__name__)
 
     def up(self):
         #pass
-        logging.info("UP: Default NOOP")
+        self.logging.info("UP: Default NOOP")
 
     def build(self):
-        logging.info("BUILD: Default NOOP")
+        self.logging.info("BUILD: Default NOOP")
 
     def down(self):
        #pass
-        logging.info("DOWN: Default NOOP")
+        self.logging.info("DOWN: Default NOOP")
 
     def _prepareTestEnv(self):
         # Should be implemented by each CI type
@@ -42,7 +43,7 @@ class CI(object):
         # KUBECONFIG=/path/to/kube/config
         # KUBE_TEST_REPO_LIST= will be set in _prepareTests
         #pass
-        logging.info("PREPARE TEST ENV: Default NOOP")
+        self.logging.info("PREPARE TEST ENV: Default NOOP")
 
     def _prepareTests(self):
         # Sets KUBE_TEST_REPO_LIST
@@ -53,7 +54,7 @@ class CI(object):
 
         out, err, ret = utils.run_cmd(cmd, stdout=True, stderr=True)
         if ret != 0:
-            logging.info("Failed to get kubernetes nodes: %s." % err)
+            self.logging.info("Failed to get kubernetes nodes: %s." % err)
             raise Exception("Failed to get kubernetes nodes: %s." % err)
         linux_nodes = out.strip().split("\n")
         for node in linux_nodes:
@@ -61,36 +62,36 @@ class CI(object):
             label_cmd=[kubectl, "label", "nodes", node, "node-role.kubernetes.io/master=NoSchedule"]
             _, err, ret = utils.run_cmd(taint_cmd, stderr=True)
             if ret != 0:
-                logging.info("Failed to taint node %s with error %s." %(node, err))
+                self.logging.info("Failed to taint node %s with error %s." %(node, err))
                 raise Exception("Failed to taint node %s with error %s." %(node, err))
             _, err, ret = utils.run_cmd(label_cmd, stderr=True)
             if ret != 0:
-                logging.info("Failed to label node %s with error %s." %(node, err))
+                self.logging.info("Failed to label node %s with error %s." %(node, err))
                 raise Exception("Failed to label node %s with error %s." %(node, err))
 
 
-        logging.info("Downloading repo-list.")
+        self.logging.info("Downloading repo-list.")
         utils.download_file(self.opts.repo_list, "/tmp/repo-list")
         os.environ["KUBE_TEST_REPO_LIST"] = "/tmp/repo-list"
 
-        logging.info("Building tests.")
+        self.logging.info("Building tests.")
         cmd = ["make", 'WHAT="./test/e2e/e2e.test ./vendor/github.com/onsi/ginkgo/ginkgo"']
         _, err, ret = utils.run_cmd(cmd, stderr=True, cwd=utils.get_k8s_folder())
 
         if ret != 0:
-            logging.error("Failed to build k8s test binaries with error: %s" % err)
+            self.logging.error("Failed to build k8s test binaries with error: %s" % err)
             raise Exception("Failed to build k8s test binaries with error: %s" % err)
 
-        logging.info("Get Kubetest")
+        self.logging.info("Get Kubetest")
         cmd = ["go", "get", "-u", "k8s.io/test-infra/kubetest"]
         _, err, ret = utils.run_cmd(cmd, stderr=True)
         if ret != 0:
-            logging.error("Failed to get kubetest binary with error: %s" % err)
+            self.logging.error("Failed to get kubetest binary with error: %s" % err)
             raise Exception("Failed to get kubetest binary with errorr: %s" % err)
 
     def _runTests(self):
         # invokes kubetest
-        logging.info("Running tests on env.")
+        self.logging.info("Running tests on env.")
         cmd = ["kubetest"]
         cmd.append("--ginkgo-parallel=%s" % self.opts.parallel_test_nodes)
         cmd.append("--verbose-commands=true")

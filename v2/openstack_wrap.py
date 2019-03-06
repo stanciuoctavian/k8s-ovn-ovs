@@ -1,9 +1,11 @@
 import utils
 import json
-import logging
+import log
 import re
 import time
 from threading import Timer
+
+logging = log.getLogger(__name__)
 
 def server_create(name, flavor, imageID, networkID, keyName, userData):
     cmd = ("openstack server create --flavor=%(flavor)s --image=%(image)s --nic net-id=%(network)s "

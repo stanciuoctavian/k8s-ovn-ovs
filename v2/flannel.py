@@ -1,5 +1,6 @@
 import ovn_ovs
 import time
+import log
 
 class Flannel_CI(ovn_ovs.OVN_OVS_CI):
 
@@ -29,3 +30,4 @@ class Flannel_CI(ovn_ovs.OVN_OVS_CI):
         self.ansible_host_var_windows_template = Flannel_CI.DEFAULT_ANSIBLE_HOST_VAR_WINDOWS_TEMPLATE
         self.ansible_host_var_dir = Flannel_CI.DEFAULT_ANSIBLE_HOST_VAR_DIR
         self.ansible_config_file = Flannel_CI.ANSIBLE_CONFIG_FILE
+        self.logging = log.getLogger(__name__)

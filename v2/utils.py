@@ -1,9 +1,10 @@
 import subprocess
 import os
-import logging
+import log
 from threading import Timer
 import errno
 
+logging = log.getLogger(__name__)
 
 class CmdTimeoutExceededException(Exception):
     pass

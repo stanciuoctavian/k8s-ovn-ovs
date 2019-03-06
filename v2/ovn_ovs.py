@@ -1,7 +1,7 @@
 import ci
 import configargparse
 import openstack_wrap as openstack
-import logging
+import log
 import utils
 import os
 import time
@@ -59,6 +59,7 @@ class OVN_OVS_CI(ci.CI):
         self.ansible_host_var_windows_template = OVN_OVS_CI.DEFAULT_ANSIBLE_HOST_VAR_WINDOWS_TEMPLATE
         self.ansible_host_var_dir = OVN_OVS_CI.DEFAULT_ANSIBLE_HOST_VAR_DIR
         self.ansible_config_file = OVN_OVS_CI.ANSIBLE_CONFIG_FILE
+        self.logging = log.getLogger(__name__)
 
 
     def _add_linux_vm(self, vm_obj):
@@ -87,7 +88,7 @@ class OVN_OVS_CI(ci.CI):
         vm_obj["FloatingIP"] = ip 
 
     def _create_vms(self):
-        logging.info("Creating Openstack VMs")
+        self.logging.info("Creating Openstack VMs")
         vmPrefix = self.opts.cluster_name
         for vm in self.opts.linuxVMs:
             openstack_vm = openstack.server_create("%s-%s" % (vmPrefix, vm), self.opts.linuxFlavor, self.opts.linuxImageID, 
@@ -103,13 +104,13 @@ class OVN_OVS_CI(ci.CI):
             openstack.server_add_floating_ip(openstack_vm['name'], fip)
             self._set_vm_fip(openstack_vm, fip)
             self._add_windows_vm(openstack_vm)
-        logging.info("Succesfuly created VMs %s" % [ vm.get("name") for vm in self._get_all_vms()])
+        self.logging.info("Succesfuly created VMs %s" % [ vm.get("name") for vm in self._get_all_vms()])
 
     def _wait_for_windows_machines(self):
-        logging.info("Waiting for Windows VMs to obtain Admin password.")
+        self.logging.info("Waiting for Windows VMs to obtain Admin password.")
         for vm in self._get_windows_vms():
             openstack.server_get_password(vm['name'], self.opts.keyFile)
-            logging.info("Windows VM: %s succesfully obtained password." % vm.get("name"))
+            self.logging.info("Windows VM: %s succesfully obtained password." % vm.get("name"))
 
     def _prepare_env(self):
         self._create_vms()
@@ -134,7 +135,7 @@ class OVN_OVS_CI(ci.CI):
         hosts_file_content = hosts_file_content.replace("KUBE_MINIONS_LINUX_PLACEHOLDER", "\n".join(linux_minions))
         hosts_file_content = hosts_file_content.replace("KUBE_MINIONS_WINDOWS_PLACEHOLDER","\n".join(windows_minions))
 
-        logging.info("Writing hosts file for ansible inventory.")
+        self.logging.info("Writing hosts file for ansible inventory.")
         with open(self.ansible_hosts_path, "w") as f:
             f.write(hosts_file_content)
 
@@ -155,7 +156,7 @@ class OVN_OVS_CI(ci.CI):
                 if vm_name.find("master") > 0:
                     vm_name = vm_name + " kubernetes"
                 hosts_entry=("%s %s\n" % (self._get_vm_fip(vm), vm_name))
-                logging.info("Adding entry %s to hosts file." % hosts_entry)
+                self.logging.info("Adding entry %s to hosts file." % hosts_entry)
                 f.write(hosts_entry)
 
         # Enable ansible log and set ssh options
@@ -172,16 +173,16 @@ class OVN_OVS_CI(ci.CI):
         # Copy kubernetes prebuilt binaries
         for file in ["kubelet","kubectl","kube-apiserver","kube-controller-manager","kube-scheduler","kube-proxy"]:
             full_file_path = os.path.join(utils.get_k8s_folder(), constants.KUBERNETES_LINUX_BINS_LOCATION, file)
-            logging.info("Copying %s to %s." % (full_file_path, full_ansible_tmp_path))
+            self.logging.info("Copying %s to %s." % (full_file_path, full_ansible_tmp_path))
             shutil.copy(full_file_path, full_ansible_tmp_path)
 
         for file in ["kubelet.exe", "kubectl.exe", "kube-proxy.exe"]:
             full_file_path = os.path.join(utils.get_k8s_folder(), constants.KUBERNETES_WINDOWS_BINS_LOCATION, file)
-            logging.info("Copying %s to %s." % (full_file_path, full_ansible_tmp_path))
+            self.logging.info("Copying %s to %s." % (full_file_path, full_ansible_tmp_path))
             shutil.copy(full_file_path, full_ansible_tmp_path)
 
     def _deploy_ansible(self):
-        logging.info("Starting Ansible deployment.")
+        self.logging.info("Starting Ansible deployment.")
         cmd = "ansible-playbook %s -v" % self.ansible_playbook
         cmd = cmd.split()
         cmd.append("--key-file=%s" % self.opts.keyFile)
@@ -189,13 +190,13 @@ class OVN_OVS_CI(ci.CI):
         out, _ ,ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root)
 
         if ret != 0:
-            logging.error("Failed to deploy ansible-playbook with error: %s" % out)
+            self.logging.error("Failed to deploy ansible-playbook with error: %s" % out)
             raise Exception("Failed to deploy ansible-playbook with error: %s" % out)
-        logging.info("Succesfully deployed ansible-playbook.")
+        self.logging.info("Succesfully deployed ansible-playbook.")
 
 
     def _waitForConnection(self, machine, windows):
-        logging.info("Waiting for connection to machine %s." % machine)
+        self.logging.info("Waiting for connection to machine %s." % machine)
         cmd = ["ansible"]
         cmd.append(machine)
         if not windows:
@@ -209,7 +210,7 @@ class OVN_OVS_CI(ci.CI):
         return ret, out
 
     def _copyTo(self, src, dest, machine, windows=False, root=False):
-        logging.info("Copying file %s to %s:%s." % (src, machine, dest))
+        self.logging.info("Copying file %s to %s:%s." % (src, machine, dest))
         cmd = ["ansible"]
         if root:
             cmd.append("--become")
@@ -224,17 +225,17 @@ class OVN_OVS_CI(ci.CI):
 
         ret, _ = self._waitForConnection(machine, windows=windows)
         if ret != 0:
-            logging.error("No connection to machine: %s", machine)
+            self.logging.error("No connection to machine: %s", machine)
             raise Exception("No connection to machine: %s", machine)
 
         # Ansible logs everything to stdout
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
         if ret != 0:
-            logging.error("Ansible failed to copy file to %s with error: %s" % (machine, out))
+            self.logging.error("Ansible failed to copy file to %s with error: %s" % (machine, out))
             raise Exception("Ansible failed to copy file to %s with error: %s" % (machine, out))
  
     def _copyFrom(self, src, dest, machine, windows=False, root=False):
-        logging.info("Copying file %s:%s to %s." % (machine, src, dest))
+        self.logging.info("Copying file %s:%s to %s." % (machine, src, dest))
         cmd = ["ansible"]
         if root:
             cmd.append("--become")
@@ -249,17 +250,17 @@ class OVN_OVS_CI(ci.CI):
         # TO DO: (atuvenie) This could really be a decorator
         ret, _ = self._waitForConnection(machine, windows=windows)
         if ret != 0:
-            logging.error("No connection to machine: %s", machine)
+            self.logging.error("No connection to machine: %s", machine)
             raise Exception("No connection to machine: %s", machine)
 
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
 
         if ret != 0:
-            logging.error("Ansible failed to fetch file from %s with error: %s" % (machine, out))
+            self.logging.error("Ansible failed to fetch file from %s with error: %s" % (machine, out))
             raise Exception("Ansible failed to fetch file from %s with error: %s" % (machine, out))
    
     def _runRemoteCmd(self, command, machine, windows=False, root=False):
-        logging.info("Running cmd on remote machine %s." % (machine))
+        self.logging.info("Running cmd on remote machine %s." % (machine))
         cmd=["ansible"]
         if root:
             cmd.append("--become")
@@ -276,20 +277,20 @@ class OVN_OVS_CI(ci.CI):
 
         ret, _ = self._waitForConnection(machine, windows=windows)
         if ret != 0:
-            logging.error("No connection to machine: %s", machine)
+            self.logging.error("No connection to machine: %s", machine)
             raise Exception("No connection to machine: %s", machine)
 
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
 
         if ret != 0:
-            logging.error("Ansible failed to run command %s on machine %s with error: %s" % (cmd, machine, out))
+            self.logging.error("Ansible failed to run command %s on machine %s with error: %s" % (cmd, machine, out))
             raise Exception("Ansible failed to run command %s on machine %s with error: %s" % (cmd, machine, out))
 
     def _prepullImages(self):
         # TO DO: This path should be passed as param
         prepull_script="/tmp/k8s-ovn-ovs/v2/prepull.ps1"
         for vm in self._get_windows_vms():
-            logging.info("Copying prepull script to node %s" % vm["name"])
+            self.logging.info("Copying prepull script to node %s" % vm["name"])
             self._copyTo(prepull_script, "c:\\", vm["name"], windows=True)
             self._runRemoteCmd("c:\\prepull.ps1", vm["name"], windows=True)
 
@@ -300,7 +301,7 @@ class OVN_OVS_CI(ci.CI):
         # Export appropriate env vars
         linux_master = self._get_linux_vms()[0].get("name")
 
-        logging.info("Copying kubeconfig from master")
+        self.logging.info("Copying kubeconfig from master")
         self._copyFrom("/root/.kube/config","/tmp/kubeconfig", linux_master, root=True)
         self._copyFrom("/etc/kubernetes/tls/ca.pem","/etc/kubernetes/tls/ca.pem", linux_master, root=True)
         self._copyFrom("/etc/kubernetes/tls/admin.pem","/etc/kubernetes/tls/admin.pem", linux_master, root=True)
@@ -325,7 +326,7 @@ class OVN_OVS_CI(ci.CI):
             time.sleep(1000000)
 
     def up(self):
-        logging.info("OVN-OVS: Bringing cluster up.")
+        self.logging.info("Bringing cluster up.")
         try:
             self._prepare_env()
             self._prepare_ansible()
@@ -334,12 +335,12 @@ class OVN_OVS_CI(ci.CI):
             raise e
     
     def build(self):
-        logging.info("OVN-OVS: Building k8s binaries.")
+        self.logging.info("Building k8s binaries.")
         utils.get_k8s(repo=self.opts.k8s_repo, branch=self.opts.k8s_branch)
         utils.build_k8s_binaries()
 
     def down(self):
-        logging.info("OVN-OVS: Destroying cluster.")
+        self.logging.info("Destroying cluster.")
         try:
             self._destroy_cluster()
         except Exception as e:

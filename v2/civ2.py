@@ -1,11 +1,12 @@
 
 import configargparse
 import ci_factory
-import logging
+import log
 import utils
 
 p = configargparse.get_argument_parser()
-logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+
+logging = log.getLogger(__name__)
 
 def parse_args():
 

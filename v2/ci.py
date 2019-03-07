@@ -7,7 +7,7 @@ import subprocess
 
 p = configargparse.get_argument_parser()
 
-p.add("--repo-list", default="https://raw.githubusercontent.com/e2e-win/e2e-win-prow-deployment/master/repo-list",
+p.add("--repo-list", default="https://raw.githubusercontent.com/kubernetes-sigs/windows-testing/master/images/image-repo-list",
                      help="Repo list with registries for test images.")
 p.add("--parallel-test-nodes", default=1)
 p.add("--test-dry-run", default="False")

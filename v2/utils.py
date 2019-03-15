@@ -39,7 +39,7 @@ def clone_repo(repo, branch="master", dest_path=None):
     if dest_path:
         cmd.append(dest_path)
     logging.info("Cloning git repo %s on branch %s in location %s" % (repo, branch, dest_path if not None else os.getcwd()))
-    _, err, ret = run_cmd(cmd, timeout=600, stderr=True)
+    _, err, ret = run_cmd(cmd, timeout=900, stderr=True)
     if ret != 0:
         raise Exception("Git Clone Failed with error: %s." % err)
     logging.info("Succesfully cloned git repo.")

@@ -33,7 +33,7 @@ p.add("--ansibleBranch", default="master", help="Ansible Repository branch for o
 class OVN_OVS_CI(ci.CI):
 
     DEFAULT_ANSIBLE_PATH="/tmp/ovn-kubernetes"
-    ANSIBLE_PLAYBOOK="ovn-kubernetes-cluster.yaml"
+    ANSIBLE_PLAYBOOK="ovn-kubernetes-cluster.yml"
     ANSIBLE_PLAYBOOK_ROOT="%s/contrib" % DEFAULT_ANSIBLE_PATH
     ANSIBLE_HOSTS_TEMPLATE=("[kube-master]\nKUBE_MASTER_PLACEHOLDER\n\n[kube-minions-linux]\nKUBE_MINIONS_LINUX_PLACEHOLDER\n\n"
                             "[kube-minions-windows]\nKUBE_MINIONS_WINDOWS_PLACEHOLDER\n")

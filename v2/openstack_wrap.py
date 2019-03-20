@@ -142,12 +142,12 @@ def server_get_password(server, ssh_key):
 
     cmd = ("nova get-password %s %s" % (server, ssh_key))
     cmd = cmd.split()
-    tries = 60 # retrying for 600 seconds / 10 second sleep = 60 times. Windows machiens take a long time to get passwd 
+    tries = 60 # retrying for 1200 seconds / 20 second sleep = 60 times. Windows machiens take a long time to get passwd 
 
     passwd = ""
     while passwd == "" and tries != 0:
         tries = tries - 1
-        time.sleep(10)
+        time.sleep(20)
         logging.info("Attempting to get password for server %s. Attempts remainging: %s." % (server, tries))
         out, err, ret = utils.run_cmd(cmd, stdout=True, stderr=True)
         if ret == 0:

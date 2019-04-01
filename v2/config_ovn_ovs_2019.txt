@@ -1,12 +1,12 @@
 [openstack]
 linuxVMs = [master, m1]
 linuxUserData = ./linux-user-data
-linuxFlavor = 6
+linuxFlavor = 9
 linuxImageID = xenial-20180831
 
 windowsVMs = [w1, w2]
 windowsUserData = ./windows-user-data
-windowsFlavor = 6
+windowsFlavor = 8
 windowsImageID = windows-2019-hyper-v-15.03.19
 
 keyName = papagalu

@@ -60,6 +60,7 @@ class OVN_OVS_CI(ci.CI):
         self.ansible_host_var_dir = OVN_OVS_CI.DEFAULT_ANSIBLE_HOST_VAR_DIR
         self.ansible_config_file = OVN_OVS_CI.ANSIBLE_CONFIG_FILE
         self.logging = log.getLogger(__name__)
+        self.post_deploy_reboot_required = True
 
 
     def _add_linux_vm(self, vm_obj):
@@ -319,8 +320,9 @@ class OVN_OVS_CI(ci.CI):
         os.environ["KUBECONFIG"] = "/tmp/kubeconfig"
 
         try:
-            for vm in self._get_windows_vms():
-                openstack.reboot_server(vm["name"])
+            if self.post_deploy_reboot_required:
+                for vm in self._get_windows_vms():
+                    openstack.reboot_server(vm["name"])
             self._prepullImages()
         except:
             time.sleep(1000000)

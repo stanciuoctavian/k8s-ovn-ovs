@@ -205,7 +205,7 @@ class OVN_OVS_CI(ci.CI):
         cmd.append("-m")
         cmd.append("wait_for_connection")
         cmd.append("-a")
-        cmd.append("'connect_timeout=5 sleep=5 timeout=360'")
+        cmd.append("'connect_timeout=5 sleep=5 timeout=600'")
 
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
         return ret, out

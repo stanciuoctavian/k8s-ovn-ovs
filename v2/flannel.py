@@ -31,3 +31,5 @@ class Flannel_CI(ovn_ovs.OVN_OVS_CI):
         self.ansible_host_var_dir = Flannel_CI.DEFAULT_ANSIBLE_HOST_VAR_DIR
         self.ansible_config_file = Flannel_CI.ANSIBLE_CONFIG_FILE
         self.logging = log.getLogger(__name__)
+
+        self.post_deploy_reboot_required = False

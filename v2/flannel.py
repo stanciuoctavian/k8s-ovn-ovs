@@ -1,8 +1,9 @@
-import ovn_ovs
+import ci
 import time
 import log
 
-class Flannel_CI(ovn_ovs.OVN_OVS_CI):
+
+class Flannel_CI(ci.CI):
 
     DEFAULT_ANSIBLE_PATH="/tmp/flannel-kubernetes"
     ANSIBLE_PLAYBOOK="kubernetes-cluster.yml"

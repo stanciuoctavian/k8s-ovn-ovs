@@ -1,6 +1,6 @@
+import deployer
 import log
 import utils
-import log
 import os
 import configargparse
 import subprocess
@@ -19,6 +19,7 @@ class CI(object):
     def __init__(self):
         self.opts = p.parse_known_args()[0]
         self.logging = log.getLogger(__name__)
+        self.deployer = deployer.NoopDeployer()
 
     def up(self):
         #pass

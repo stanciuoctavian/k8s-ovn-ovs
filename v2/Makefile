@@ -1,5 +1,5 @@
 IMG = e2eteam/k8s-ovn-ovs-ci
-TAG = dev-v2
+TAG = dev-terraform
 
 all: build
 

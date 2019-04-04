@@ -1,7 +1,7 @@
 FROM ubuntu:xenial
 
 RUN apt-get update &&  apt-get install -y software-properties-common python python-pip \
-    git make curl build-essential libssl-dev libffi-dev python-dev python-openssl wget
+    git make curl build-essential libssl-dev libffi-dev python-dev python-openssl wget unzip
 
 RUN pip install --upgrade setuptools && \
     pip install python-openstackclient && \
@@ -40,6 +40,13 @@ RUN wget -q https://dl.google.com/dl/cloudsdk/channels/rapid/google-cloud-sdk.ta
         --usage-reporting=false && \
     gcloud components install alpha beta && \
     gcloud info | tee /gcloud-info.txt
+
+RUN wget -q https://releases.hashicorp.com/terraform/0.11.13/terraform_0.11.13_linux_amd64.zip && \
+    unzip terraform_0.11.13_linux_amd64.zip && \
+    rm terraform_0.11.13_linux_amd64.zip && \
+    mv terraform /usr/local/bin
+
+RUN pip install azure
 
 WORKDIR /workspace
 ADD bootstrap.py  /workspace

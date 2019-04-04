@@ -68,6 +68,18 @@ resource "azurerm_network_security_group" "masterNSG" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
+
+  security_rule {
+    name                       = "SSL"
+    priority                   = 1002
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
 }
 
 # Create network interface
@@ -109,14 +121,14 @@ resource "azurerm_virtual_machine" "masterVM" {
 
   os_profile {
     computer_name  = "${var.master_vm_name}"
-    admin_username = "azureuser"
+    admin_username = "ubuntu"
   }
 
   os_profile_linux_config {
     disable_password_authentication = true
 
     ssh_keys {
-      path     = "/home/azureuser/.ssh/authorized_keys"
+      path     = "/home/ubuntu/.ssh/authorized_keys"
       key_data = "${var.ssh_key_data}"
     }
   }
@@ -193,7 +205,7 @@ resource "azurerm_virtual_machine_extension" "powershell_winrm" {
 
   settings = <<SETTINGS
     {
-        "fileUris": ["https://raw.githubusercontent.com/Azure/aks-engine/master/extensions/winrm/v1/enableWinrm.ps1"],
+        "fileUris": ["https://raw.githubusercontent.com/adelina-t/k8s-ovn-ovs/terraform_flannel/v2/enableWinrm.ps1"],
         "commandToExecute": "powershell -ExecutionPolicy Unrestricted -File enableWinrm.ps1"
     }
 SETTINGS

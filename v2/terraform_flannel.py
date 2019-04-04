@@ -1,165 +1,73 @@
 import ci
 import configargparse
-import openstack_wrap as openstack
-import log
+import constants
 import utils
 import os
-import time
+import terraform
 import shutil
-import constants
 import yaml
 
 p = configargparse.get_argument_parser()
 
-p.add("--linuxVMs", action="append", help="Name for linux VMS. List.")
-p.add("--linuxUserData", help="Linux VMS user-data.")
-p.add("--linuxFlavor", help="Linux VM flavor.")
-p.add("--linuxImageID", help="ImageID for linux VMs.")
-
-p.add("--windowsVMs", action="append", help="Name for Windows VMs. List.")
-p.add("--windowsUserData", help="Windows VMS user-data.")
-p.add("--windowsFlavor", help="Windows VM flavor.")
-p.add("--windowsImageID", help="ImageID for windows VMs.")
-
-p.add("--keyName", help="Openstack SSH key name")
-p.add("--keyFile", help="Openstack SSH private key")
-
-p.add("--internalNet", help="Internal Network for VMs")
-p.add("--externalNet", help="External Network for floating ips")
-
-p.add("--ansibleRepo", default="http://github.com/openvswitch/ovn-kubernetes", help="Ansible Repository for ovn-ovs playbooks.")
+p.add("--ansibleRepo", default="http://github.com/e2e-win/flannel-kubernetes", help="Ansible Repository for ovn-ovs playbooks.")
 p.add("--ansibleBranch", default="master", help="Ansible Repository branch for ovn-ovs playbooks.")
 
-class OVN_OVS_CI(ci.CI):
+class Terraform_Flannel(ci.CI):
 
-    DEFAULT_ANSIBLE_PATH="/tmp/ovn-kubernetes"
-    ANSIBLE_PLAYBOOK="ovn-kubernetes-cluster.yml"
-    ANSIBLE_PLAYBOOK_ROOT="%s/contrib" % DEFAULT_ANSIBLE_PATH
-    ANSIBLE_HOSTS_TEMPLATE=("[kube-master]\nKUBE_MASTER_PLACEHOLDER\n\n[kube-minions-linux]\nKUBE_MINIONS_LINUX_PLACEHOLDER\n\n"
+    DEFAULT_ANSIBLE_PATH="/tmp/flannel-kubernetes"
+    ANSIBLE_PLAYBOOK="kubernetes-cluster.yml"
+    ANSIBLE_PLAYBOOK_ROOT=DEFAULT_ANSIBLE_PATH
+    ANSIBLE_HOSTS_TEMPLATE=("[kube-master]\nKUBE_MASTER_PLACEHOLDER\n\n"
                             "[kube-minions-windows]\nKUBE_MINIONS_WINDOWS_PLACEHOLDER\n")
-    ANSIBLE_HOSTS_PATH="%s/contrib/inventory/hosts" % DEFAULT_ANSIBLE_PATH
+    ANSIBLE_HOSTS_PATH="%s/inventory/hosts" % ANSIBLE_PLAYBOOK_ROOT
     DEFAULT_ANSIBLE_WINDOWS_ADMIN="Admin"
     DEFAULT_ANSIBLE_HOST_VAR_WINDOWS_TEMPLATE="ansible_user: USERNAME_PLACEHOLDER\nansible_password: PASS_PLACEHOLDER\n"
-    DEFAULT_ANSIBLE_HOST_VAR_DIR="%s/contrib/inventory/host_vars" % DEFAULT_ANSIBLE_PATH
+    DEFAULT_ANSIBLE_HOST_VAR_DIR="%s/inventory/host_vars" % ANSIBLE_PLAYBOOK_ROOT
     HOSTS_FILE="/etc/hosts"
-    ANSIBLE_CONFIG_FILE="%s/contrib/ansible.cfg" % DEFAULT_ANSIBLE_PATH
+    ANSIBLE_CONFIG_FILE="%s/ansible.cfg" % ANSIBLE_PLAYBOOK_ROOT
 
     KUBE_CONFIG_PATH="/root/.kube/config"
     KUBE_TLS_SRC_PATH="/etc/kubernetes/tls/"
 
-    def __init__(self): 
-        self.opts = p.parse_known_args()[0]
-        self.cluster = {}
-        self.default_ansible_path = OVN_OVS_CI.DEFAULT_ANSIBLE_PATH
-        self.ansible_playbook = OVN_OVS_CI.ANSIBLE_PLAYBOOK
-        self.ansible_playbook_root = OVN_OVS_CI.ANSIBLE_PLAYBOOK_ROOT
-        self.ansible_hosts_template = OVN_OVS_CI.ANSIBLE_HOSTS_TEMPLATE
-        self.ansible_hosts_path = OVN_OVS_CI.ANSIBLE_HOSTS_PATH
-        self.ansible_windows_admin = OVN_OVS_CI.DEFAULT_ANSIBLE_WINDOWS_ADMIN
-        self.ansible_host_var_windows_template = OVN_OVS_CI.DEFAULT_ANSIBLE_HOST_VAR_WINDOWS_TEMPLATE
-        self.ansible_host_var_dir = OVN_OVS_CI.DEFAULT_ANSIBLE_HOST_VAR_DIR
-        self.ansible_config_file = OVN_OVS_CI.ANSIBLE_CONFIG_FILE
-        self.logging = log.getLogger(__name__)
-        self.post_deploy_reboot_required = True
+    def __init__(self):
+        super(Terraform_Flannel, self).__init__()
 
+        self.deployer = terraform.TerraformProvisioner()
 
-    def _add_linux_vm(self, vm_obj):
-        if self.cluster.get("linuxVMs") == None:
-            self.cluster["linuxVMs"] = []
-        self.cluster["linuxVMs"].append(vm_obj)
-
-    def _add_windows_vm(self, vm_obj):
-        if self.cluster.get("windowsVMs") == None:
-            self.cluster["windowsVMs"] = []
-        self.cluster["windowsVMs"].append(vm_obj)
-
-    def _get_windows_vms(self):
-        return self.cluster.get("windowsVMs")
-
-    def _get_linux_vms(self):
-        return self.cluster.get("linuxVMs")
-
-    def _get_all_vms(self):
-        return self._get_linux_vms() + self._get_windows_vms()
-
-    def _get_vm_fip(self, vm_obj):
-        return vm_obj.get("FloatingIP")
-
-    def _set_vm_fip(self, vm_obj, ip):
-        vm_obj["FloatingIP"] = ip 
-
-    def _create_vms(self):
-        self.logging.info("Creating Openstack VMs")
-        vmPrefix = self.opts.cluster_name
-        for vm in self.opts.linuxVMs:
-            openstack_vm = openstack.server_create("%s-%s" % (vmPrefix, vm), self.opts.linuxFlavor, self.opts.linuxImageID, 
-                                                   self.opts.internalNet, self.opts.keyName, self.opts.linuxUserData)
-            fip = openstack.get_floating_ip(openstack.floating_ip_list()[0])
-            openstack.server_add_floating_ip(openstack_vm['name'], fip)
-            self._set_vm_fip(openstack_vm, fip)
-            self._add_linux_vm(openstack_vm)
-        for vm in self.opts.windowsVMs:
-            openstack_vm = openstack.server_create("%s-%s" % (vmPrefix, vm), self.opts.windowsFlavor, self.opts.windowsImageID, 
-                                                   self.opts.internalNet, self.opts.keyName, self.opts.windowsUserData)
-            fip = openstack.get_floating_ip(openstack.floating_ip_list()[0])
-            openstack.server_add_floating_ip(openstack_vm['name'], fip)
-            self._set_vm_fip(openstack_vm, fip)
-            self._add_windows_vm(openstack_vm)
-        self.logging.info("Succesfuly created VMs %s" % [ vm.get("name") for vm in self._get_all_vms()])
-
-    def _wait_for_windows_machines(self):
-        self.logging.info("Waiting for Windows VMs to obtain Admin password.")
-        for vm in self._get_windows_vms():
-            openstack.server_get_password(vm['name'], self.opts.keyFile)
-            self.logging.info("Windows VM: %s succesfully obtained password." % vm.get("name"))
-
-    def _prepare_env(self):
-        self._create_vms()
-        self._wait_for_windows_machines()
-
-    def _destroy_cluster(self):
-        vmPrefix = self.opts.cluster_name
-        for vm in self.opts.linuxVMs:
-            openstack.server_delete("%s-%s" % (vmPrefix, vm))
-        for vm in self.opts.windowsVMs:
-            openstack.server_delete("%s-%s" % (vmPrefix, vm))
+        self.default_ansible_path = Terraform_Flannel.DEFAULT_ANSIBLE_PATH
+        self.ansible_windows_admin = 'azureuser'
+        self.ansible_playbook = Terraform_Flannel.ANSIBLE_PLAYBOOK
+        self.ansible_playbook_root = Terraform_Flannel.ANSIBLE_PLAYBOOK_ROOT
+        self.ansible_hosts_template = Terraform_Flannel.ANSIBLE_HOSTS_TEMPLATE
+        self.ansible_hosts_path = Terraform_Flannel.ANSIBLE_HOSTS_PATH
+        self.ansible_windows_admin = Terraform_Flannel.DEFAULT_ANSIBLE_WINDOWS_ADMIN
+        self.ansible_host_var_windows_template = Terraform_Flannel.DEFAULT_ANSIBLE_HOST_VAR_WINDOWS_TEMPLATE
+        self.ansible_host_var_dir = Terraform_Flannel.DEFAULT_ANSIBLE_HOST_VAR_DIR
+        self.ansible_config_file = Terraform_Flannel.ANSIBLE_CONFIG_FILE
 
     def _prepare_ansible(self):
         utils.clone_repo(self.opts.ansibleRepo, self.opts.ansibleBranch, self.default_ansible_path)
         
         # Creating ansible hosts file
-        linux_master = self._get_linux_vms()[0].get("name")
-        linux_minions = [vm.get("name") for vm in self._get_linux_vms()[1:]]
-        windows_minions = [vm.get("name") for vm in self._get_windows_vms()]
+        linux_master_hostname = self.deployer.get_cluster_master_vm_name()
+        windows_minions_hostnames = self.deployer.get_cluster_win_minion_vms_names()
 
-        hosts_file_content = self.ansible_hosts_template.replace("KUBE_MASTER_PLACEHOLDER", linux_master)
-        hosts_file_content = hosts_file_content.replace("KUBE_MINIONS_LINUX_PLACEHOLDER", "\n".join(linux_minions))
-        hosts_file_content = hosts_file_content.replace("KUBE_MINIONS_WINDOWS_PLACEHOLDER","\n".join(windows_minions))
+        hosts_file_content = self.ansible_hosts_template.replace("KUBE_MASTER_PLACEHOLDER", linux_master_hostname)
+        hosts_file_content = hosts_file_content.replace("KUBE_MINIONS_WINDOWS_PLACEHOLDER","\n".join(windows_minions_hostnames))
 
         self.logging.info("Writing hosts file for ansible inventory.")
         with open(self.ansible_hosts_path, "w") as f:
             f.write(hosts_file_content)
 
         # Creating hosts_vars for hosts
-        for vm in self._get_windows_vms():
-            vm_name = vm.get("name")
-            vm_username = self.ansible_windows_admin # TO DO: Have this configurable trough opts
-            vm_pass = openstack.server_get_password(vm_name, self.opts.keyFile)
+        for vm_name in windows_minions_hostnames:
+            vm_username = self.deployer.get_win_vm_username(vm_name) # TO DO: Have this configurable trough opts
+            vm_pass = self.deployer.get_win_vm_password(vm_name)
             hosts_var_content = self.ansible_host_var_windows_template.replace("USERNAME_PLACEHOLDER", vm_username).replace("PASS_PLACEHOLDER", vm_pass)
             filepath = os.path.join(self.ansible_host_var_dir, vm_name)
             with open(filepath, "w") as f:
                 f.write(hosts_var_content)
-
-        # Populate hosts file
-        with open(OVN_OVS_CI.HOSTS_FILE,"a") as f:
-            for vm in self._get_all_vms():
-                vm_name =  vm.get("name")
-                if vm_name.find("master") > 0:
-                    vm_name = vm_name + " kubernetes"
-                hosts_entry=("%s %s\n" % (self._get_vm_fip(vm), vm_name))
-                self.logging.info("Adding entry %s to hosts file." % hosts_entry)
-                f.write(hosts_entry)
-
+    
         # Enable ansible log and set ssh options
         with open(self.ansible_config_file, "a") as f:
             log_file = os.path.join(self.opts.log_path, "ansible-deploy.log")
@@ -186,7 +94,7 @@ class OVN_OVS_CI(ci.CI):
         self.logging.info("Starting Ansible deployment.")
         cmd = "ansible-playbook %s -v" % self.ansible_playbook
         cmd = cmd.split()
-        cmd.append("--key-file=%s" % self.opts.keyFile)
+        cmd.append("--key-file=%s" % self.opts.ssh_private_key_path)
 
         out, _ ,ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root)
 
@@ -201,7 +109,7 @@ class OVN_OVS_CI(ci.CI):
         cmd = ["ansible"]
         cmd.append(machine)
         if not windows:
-            cmd.append("--key-file=%s" % self.opts.keyFile)
+            cmd.append("--key-file=%s" % self.opts.ssh_private_key_path)
         cmd.append("-m")
         cmd.append("wait_for_connection")
         cmd.append("-a")
@@ -216,7 +124,7 @@ class OVN_OVS_CI(ci.CI):
         if root:
             cmd.append("--become")
         if not windows:
-            cmd.append("--key-file=%s" % self.opts.keyFile)
+            cmd.append("--key-file=%s" % self.opts.ssh_private_key_path)
         cmd.append(machine)
         cmd.append("-m")
         module = "win_copy" if windows else "copy"
@@ -241,7 +149,7 @@ class OVN_OVS_CI(ci.CI):
         if root:
             cmd.append("--become")
         if not windows:
-            cmd.append("--key-file=%s" % self.opts.keyFile)
+            cmd.append("--key-file=%s" % self.opts.ssh_private_key_path)
         cmd.append(machine)
         cmd.append("-m")
         cmd.append("fetch")
@@ -269,7 +177,7 @@ class OVN_OVS_CI(ci.CI):
             task = "win_shell"
         else:
             task = "shell"
-            cmd.append("--key-file=%s" % self.opts.keyFile)
+            cmd.append("--key-file=%s" % self.opts.ssh_private_key_path)
         cmd.append(machine)
         cmd.append("-m")
         cmd.append(task)
@@ -290,17 +198,16 @@ class OVN_OVS_CI(ci.CI):
     def _prepullImages(self):
         # TO DO: This path should be passed as param
         prepull_script="/tmp/k8s-ovn-ovs/v2/prepull.ps1"
-        for vm in self._get_windows_vms():
-            self.logging.info("Copying prepull script to node %s" % vm["name"])
-            self._copyTo(prepull_script, "c:\\", vm["name"], windows=True)
-            self._runRemoteCmd("c:\\prepull.ps1", vm["name"], windows=True)
-
+        for vm_name in self.deployer.get_cluster_win_minion_vms_names():
+            self.logging.info("Copying prepull script to node %s" % vm_name)
+            self._copyTo(prepull_script, "c:\\", vm_name, windows=True)
+            self._runRemoteCmd("c:\\prepull.ps1", vm_name, windows=True)
 
     def _prepareTestEnv(self):
-        # For OVN-OVS CI: copy config file from .kube folder of the master node
+        # For Ansible based CIs: copy config file from .kube folder of the master node
         # Replace Server in config with dns-name for the machine
         # Export appropriate env vars
-        linux_master = self._get_linux_vms()[0].get("name")
+        linux_master = self.deployer.get_cluster_master_vm_name()
 
         self.logging.info("Copying kubeconfig from master")
         self._copyFrom("/root/.kube/config","/tmp/kubeconfig", linux_master, root=True)
@@ -319,31 +226,25 @@ class OVN_OVS_CI(ci.CI):
         os.environ["KUBE_MASTER_URL"] = "https://kubernetes"
         os.environ["KUBECONFIG"] = "/tmp/kubeconfig"
 
-        try:
-            if self.post_deploy_reboot_required:
-                for vm in self._get_windows_vms():
-                    openstack.reboot_server(vm["name"])
-            self._prepullImages()
-        except:
-            pass
+        self._prepullImages()
 
-    def up(self):
-        self.logging.info("Bringing cluster up.")
-        try:
-            self._prepare_env()
-            self._prepare_ansible()
-            self._deploy_ansible()
-        except Exception as e:
-            raise e
-    
     def build(self):
         self.logging.info("Building k8s binaries.")
         utils.get_k8s(repo=self.opts.k8s_repo, branch=self.opts.k8s_branch)
         utils.build_k8s_binaries()
 
+    def up(self):
+        self.logging.info("Bringing cluster up.")
+        try:
+            self.deployer.up()
+            self._prepare_ansible()
+            self._deploy_ansible()
+        except Exception as e:
+            raise e
+    
     def down(self):
         self.logging.info("Destroying cluster.")
         try:
-            self._destroy_cluster()
+            self.deployer.down()
         except Exception as e:
             raise e

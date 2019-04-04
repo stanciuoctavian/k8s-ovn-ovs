@@ -1,0 +1,9 @@
+[terraform]
+
+location = westeurope
+rg_name = test-deployment
+
+master-vm-name = test-master
+
+win-minion-count = 3
+win-minion-name = test-min

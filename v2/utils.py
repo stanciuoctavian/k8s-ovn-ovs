@@ -3,13 +3,15 @@ import os
 import log
 from threading import Timer
 import errno
+import shutil
 
 logging = log.getLogger(__name__)
 
 class CmdTimeoutExceededException(Exception):
     pass
 
-def run_cmd(cmd, timeout=50000, env=None, stdout=False, stderr=False, cwd=None, shell=False):
+def run_cmd(cmd, timeout=50000, env=None, stdout=False,
+            stderr=False, cwd=None, shell=False, sensitive=False):
 
     def kill_proc_timout(proc):
         proc.kill()
@@ -22,7 +24,8 @@ def run_cmd(cmd, timeout=50000, env=None, stdout=False, stderr=False, cwd=None, 
         f_stdout = subprocess.PIPE
     if stderr == True:
         f_stderr = subprocess.PIPE
-    logging.info("Calling %s" % " ".join(cmd))
+    if not sensitive:
+        logging.info("Calling %s" % " ".join(cmd))
     if shell:
         cmd = " ".join(cmd)
     proc = subprocess.Popen(cmd, env=env, stdout=f_stdout, stderr=f_stderr, cwd=cwd, shell=shell)
@@ -43,7 +46,11 @@ def clone_repo(repo, branch="master", dest_path=None):
     if ret != 0:
         raise Exception("Git Clone Failed with error: %s." % err)
     logging.info("Succesfully cloned git repo.")
- 
+
+def rm_dir(dir_path):
+    if os.path.exists(dir_path):
+        shutil.rmtree(dir_path, ignore_errors=True)
+
 def mkdir_p(dir_path):
     try:
         os.mkdir(dir_path)

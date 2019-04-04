@@ -57,7 +57,7 @@ def main():
             ci.down()
         return success
     except Exception as e:
-        print e
+        logging.error(e)
         if opts.down == True:
             ci.down() 
 

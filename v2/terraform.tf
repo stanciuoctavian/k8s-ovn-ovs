@@ -34,12 +34,22 @@ resource "azurerm_virtual_network" "clusterNet" {
   resource_group_name = "${azurerm_resource_group.clusterRg.name}"
 }
 
+# Create routeTable
+
+resource "azurerm_route_table" "routeTable" {
+  name                = "routeTable"
+  resource_group_name = "${azurerm_resource_group.clusterRg.name}"
+  location            = "${var.location}"
+}
+
 # Create subnet
 resource "azurerm_subnet" "clusterSubnet" {
   name                 = "clusterSubnet"
   resource_group_name  = "${azurerm_resource_group.clusterRg.name}"
   virtual_network_name = "${azurerm_virtual_network.clusterNet.name}"
   address_prefix       = "192.168.168.0/24"
+  route_table_id       = "${azurerm_route_table.routeTable.id}"
+  depends_on           = ["azurerm_route_table.routeTable"]
 }
 
 # Master VM Definition
@@ -88,6 +98,7 @@ resource "azurerm_network_interface" "masterNic" {
   location                  = "${var.location}"
   resource_group_name       = "${azurerm_resource_group.clusterRg.name}"
   network_security_group_id = "${azurerm_network_security_group.masterNSG.id}"
+  enable_ip_forwarding      = true
 
   ip_configuration {
     name                          = "masterNicConfig"
@@ -184,6 +195,7 @@ resource "azurerm_network_interface" "winMinNic" {
   location                  = "${var.location}"
   resource_group_name       = "${azurerm_resource_group.clusterRg.name}"
   network_security_group_id = "${azurerm_network_security_group.winNSG.id}"
+  enable_ip_forwarding      = true
 
   ip_configuration {
     name                          = "winMinNicConfig-${count.index}"

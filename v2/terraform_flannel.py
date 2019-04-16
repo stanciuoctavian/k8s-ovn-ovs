@@ -6,11 +6,13 @@ import os
 import terraform
 import shutil
 import yaml
+import json
 
 p = configargparse.get_argument_parser()
 
 p.add("--ansibleRepo", default="http://github.com/e2e-win/flannel-kubernetes", help="Ansible Repository for ovn-ovs playbooks.")
 p.add("--ansibleBranch", default="master", help="Ansible Repository branch for ovn-ovs playbooks.")
+p.add("--flannelMode", default="overlay", help="Option: overlay or host-gw")
 
 class Terraform_Flannel(ci.CI):
 
@@ -23,11 +25,50 @@ class Terraform_Flannel(ci.CI):
     DEFAULT_ANSIBLE_WINDOWS_ADMIN="Admin"
     DEFAULT_ANSIBLE_HOST_VAR_WINDOWS_TEMPLATE="ansible_user: USERNAME_PLACEHOLDER\nansible_password: PASS_PLACEHOLDER\n"
     DEFAULT_ANSIBLE_HOST_VAR_DIR="%s/inventory/host_vars" % ANSIBLE_PLAYBOOK_ROOT
+    DEFAULT_GROUP_VARS_PATH="%s/inventory/group_vars/all" % ANSIBLE_PLAYBOOK_ROOT
     HOSTS_FILE="/etc/hosts"
     ANSIBLE_CONFIG_FILE="%s/ansible.cfg" % ANSIBLE_PLAYBOOK_ROOT
 
     KUBE_CONFIG_PATH="/root/.kube/config"
     KUBE_TLS_SRC_PATH="/etc/kubernetes/tls/"
+
+    FLANNEL_MODE_OVERLAY = "overlay"
+    FLANNEL_MODE_L2BRIDGE = "host-gw"
+
+    AZURE_CCM_LOCAL_PATH = "/tmp/azure.json"
+    AZURE_CONFIG_TEMPALTE = {
+        "cloud":"AzurePublicCloud",
+        "tenantId": "",
+        "subscriptionId": "",
+        "aadClientId": "",
+        "aadClientSecret": "",
+        "resourceGroup": "",
+        "location": "",
+        "subnetName": "clusterSubnet",
+        "securityGroupName": "masterNSG",
+        "vnetName": "clusterNet",
+        "vnetResourceGroup": "",
+        "routeTableName": "routeTable",
+        "primaryAvailabilitySetName": "",
+        "primaryScaleSetName": "",
+        "cloudProviderBackoff": True,
+        "cloudProviderBackoffRetries": 6,
+        "cloudProviderBackoffExponent": 1.5,
+        "cloudProviderBackoffDuration": 5,
+        "cloudProviderBackoffJitter": 1,
+        "cloudProviderRatelimit": True,
+        "cloudProviderRateLimitQPS": 3,
+        "cloudProviderRateLimitBucket": 10,
+        "useManagedIdentityExtension": False,
+        "userAssignedIdentityID": "",
+        "useInstanceMetadata": True,
+        "loadBalancerSku": "Basic",
+        "excludeMasterFromStandardLB": False,
+        "providerVaultName": "",
+        "maximumLoadBalancerRuleCount": 250,
+        "providerKeyName": "k8s",
+        "providerKeyVersion": ""
+    }
 
     def __init__(self):
         super(Terraform_Flannel, self).__init__()
@@ -44,6 +85,22 @@ class Terraform_Flannel(ci.CI):
         self.ansible_host_var_windows_template = Terraform_Flannel.DEFAULT_ANSIBLE_HOST_VAR_WINDOWS_TEMPLATE
         self.ansible_host_var_dir = Terraform_Flannel.DEFAULT_ANSIBLE_HOST_VAR_DIR
         self.ansible_config_file = Terraform_Flannel.ANSIBLE_CONFIG_FILE
+        self.ansible_group_vars_file = Terraform_Flannel.DEFAULT_GROUP_VARS_PATH
+
+    def _generate_azure_config(self):
+        azure_config = Terraform_Flannel.AZURE_CONFIG_TEMPALTE
+        azure_config["tenantId"] = os.getenv("AZURE_TENANT_ID").strip()
+        azure_config["subscriptionId"] = os.getenv("AZURE_SUB_ID").strip()
+        azure_config["aadClientId"] = os.getenv("AZURE_CLIENT_ID").strip()
+        azure_config["aadClientSecret"] = os.getenv("AZURE_CLIENT_SECRET").strip()
+
+        azure_config["resourceGroup"] = self.opts.rg_name
+        azure_config["location"] = self.opts.location
+        azure_config["vnetResourceGroup"] = self.opts.rg_name
+
+        with open(Terraform_Flannel.AZURE_CCM_LOCAL_PATH, "w") as f:
+            f.write(json.dumps(azure_config))
+
 
     def _prepare_ansible(self):
         utils.clone_repo(self.opts.ansibleRepo, self.opts.ansibleBranch, self.default_ansible_path)
@@ -89,6 +146,15 @@ class Terraform_Flannel(ci.CI):
             full_file_path = os.path.join(utils.get_k8s_folder(), constants.KUBERNETES_WINDOWS_BINS_LOCATION, file)
             self.logging.info("Copying %s to %s." % (full_file_path, full_ansible_tmp_path))
             shutil.copy(full_file_path, full_ansible_tmp_path)
+
+        # Generate azure.json if needed and populate group vars with necessary paths
+        if self.opts.flannelMode == Terraform_Flannel.FLANNEL_MODE_L2BRIDGE:
+            self._generate_azure_config()
+
+            with open(self.ansible_group_vars_file, "a") as f:
+                f.write("AZURE_CCM: true\n")
+                f.write("AZURE_CCM_LOCAL_PATH: %s\n" % Terraform_Flannel.AZURE_CCM_LOCAL_PATH)
+
 
     def _deploy_ansible(self):
         self.logging.info("Starting Ansible deployment.")

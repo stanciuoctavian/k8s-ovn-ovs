@@ -58,8 +58,6 @@ def main():
         return success
     except Exception as e:
         logging.error(e)
-        import time
-        time.sleep(1000000)
         if opts.down == True:
             ci.down() 
 

@@ -147,13 +147,19 @@ class Terraform_Flannel(ci.CI):
             self.logging.info("Copying %s to %s." % (full_file_path, full_ansible_tmp_path))
             shutil.copy(full_file_path, full_ansible_tmp_path)
 
+
+        azure_ccm = "false"
         # Generate azure.json if needed and populate group vars with necessary paths
         if self.opts.flannelMode == Terraform_Flannel.FLANNEL_MODE_L2BRIDGE:
             self._generate_azure_config()
+            azure_ccm = "true"
 
-            with open(self.ansible_group_vars_file, "a") as f:
-                f.write("AZURE_CCM: true\n")
-                f.write("AZURE_CCM_LOCAL_PATH: %s\n" % Terraform_Flannel.AZURE_CCM_LOCAL_PATH)
+
+        # Set flannel mode in group vars
+        with open(self.ansible_group_vars_file, "a") as f:
+            f.write("FLANNEL_MODE: %s\n" % self.opts.flannelMode)
+            f.write("AZURE_CCM: %s\n" % azure_ccm)
+            f.write("AZURE_CCM_LOCAL_PATH: %s\n" % Terraform_Flannel.AZURE_CCM_LOCAL_PATH)
 
 
     def _deploy_ansible(self):

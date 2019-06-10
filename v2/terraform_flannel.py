@@ -13,6 +13,7 @@ p = configargparse.get_argument_parser()
 p.add("--ansibleRepo", default="http://github.com/e2e-win/flannel-kubernetes", help="Ansible Repository for ovn-ovs playbooks.")
 p.add("--ansibleBranch", default="master", help="Ansible Repository branch for ovn-ovs playbooks.")
 p.add("--flannelMode", default="overlay", help="Option: overlay or host-gw")
+p.add("--containerRuntime", default="docker", help="Container runtime to set in ansible: docker / containerd.")
 
 class Terraform_Flannel(ci.CI):
 
@@ -116,6 +117,12 @@ class Terraform_Flannel(ci.CI):
         with open(self.ansible_hosts_path, "w") as f:
             f.write(hosts_file_content)
 
+        # This proliferation of args should be set to cli to ansible when called
+        win_hosts_extra_vars = "\nCONTAINER_RUNTIME: \"%s\"" % self.opts.containerRuntime
+        if self.opts.containerRuntime == "containerd":
+            win_hosts_extra_vars += "\nCNIBINS: \"sdnms\""
+
+
         # Creating hosts_vars for hosts
         for vm_name in windows_minions_hostnames:
             vm_username = self.deployer.get_win_vm_username(vm_name) # TO DO: Have this configurable trough opts
@@ -124,6 +131,7 @@ class Terraform_Flannel(ci.CI):
             filepath = os.path.join(self.ansible_host_var_dir, vm_name)
             with open(filepath, "w") as f:
                 f.write(hosts_var_content)
+                f.write(win_hosts_extra_vars)
     
         # Enable ansible log and set ssh options
         with open(self.ansible_config_file, "a") as f:

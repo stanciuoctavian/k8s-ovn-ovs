@@ -117,6 +117,10 @@ class CI(object):
     def test(self):
         self._prepareTestEnv()
         self._prepareTests()
+        # Only for debugging in a container. Will speep so user can run tests on a prepared env.
+        if self.opts.hold == True:
+            import time
+            time.sleep(1000000)
         ret = self._runTests()
         if ret != 0:
             return ret

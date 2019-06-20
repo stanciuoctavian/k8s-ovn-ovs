@@ -107,7 +107,7 @@ class CI(object):
         cmd.append("--provider=skeleton")
         cmd.append("--test")
         cmd.append("--dump=%s" % self.opts.log_path)
-        cmd.append('--test_args=--ginkgo.flakeAttempts=3 --num-nodes=2 --ginkgo.noColor --ginkgo.dryRun=%(dryRun)s --node-os-distro=windows --ginkgo.focus=%(focus)s --ginkgo.skip=%(skip)s' % {
+        cmd.append('--test_args=--ginkgo.flakeAttempts=1 --num-nodes=2 --ginkgo.noColor --ginkgo.dryRun=%(dryRun)s --node-os-distro=windows --ginkgo.focus=%(focus)s --ginkgo.skip=%(skip)s' % {
                                                                                                 "dryRun": self.opts.test_dry_run,
                                                                                                 "focus": self.opts.test_focus_regex,
                                                                                                 "skip": self.opts.test_skip_regex
@@ -117,6 +117,10 @@ class CI(object):
     def test(self):
         self._prepareTestEnv()
         self._prepareTests()
+        # Only for debugging in a container. Will speep so user can run tests on a prepared env.
+        if self.opts.hold == True:
+            import time
+            time.sleep(1000000)
         ret = self._runTests()
         if ret != 0:
             return ret

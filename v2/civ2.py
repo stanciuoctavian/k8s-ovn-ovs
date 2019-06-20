@@ -29,6 +29,8 @@ def parse_args():
     p.add('--cluster-name', help="Name of cluster.")
     p.add('--k8s-repo', default="http://github.com/kubernetes/kubernetes")
     p.add('--k8s-branch', default="master")
+    p.add('--hold', type=str2bool, default=False, help='Useful for debugging while running in containerd. \
+                                                        Sleeps the process after setting the env for testing so user can manually exec from container.')
     
     opts = p.parse_known_args()
 

@@ -281,7 +281,7 @@ class Terraform_Flannel(ci.CI):
         for vm_name in self.deployer.get_cluster_win_minion_vms_names():
             self.logging.info("Copying prepull script to node %s" % vm_name)
             self._copyTo(prepull_script, "c:\\", vm_name, windows=True)
-            self._runRemoteCmd(("c:\\prepull.ps1 --runtime=%s" % runtime), vm_name, windows=True)
+            self._runRemoteCmd(("c:\\prepull.ps1 -runtime %s" % runtime), vm_name, windows=True)
 
     def _prepareTestEnv(self):
         # For Ansible based CIs: copy config file from .kube folder of the master node
@@ -306,7 +306,7 @@ class Terraform_Flannel(ci.CI):
         os.environ["KUBE_MASTER_URL"] = "https://kubernetes"
         os.environ["KUBECONFIG"] = "/tmp/kubeconfig"
 
-        self._prepullImages(self.opts.runtime)
+        self._prepullImages(self.opts.containerRuntime)
 
     def build(self):
         self.logging.info("Building k8s binaries.")

@@ -3,6 +3,7 @@ import configargparse
 import ci_factory
 import log
 import utils
+import sys
 
 p = configargparse.get_argument_parser()
 
@@ -31,12 +32,12 @@ def parse_args():
     p.add('--k8s-branch', default="master")
     p.add('--hold', type=str2bool, default=False, help='Useful for debugging while running in containerd. \
                                                         Sleeps the process after setting the env for testing so user can manually exec from container.')
-    
+
     opts = p.parse_known_args()
 
     return opts
 
-     
+
 def main():
     try:
         opts = parse_args()[0]
@@ -57,11 +58,14 @@ def main():
             success = ci.test()
         if opts.down == True:
             ci.down()
-        return success
+        if success != 0:
+            raise Exception
+        sys.exit(0)
     except Exception as e:
         logging.error(e)
         if opts.down == True:
-            ci.down() 
+            ci.down()
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

@@ -3,6 +3,7 @@ import configargparse
 import ci_factory
 import log
 import utils
+import sys
 
 p = configargparse.get_argument_parser()
 
@@ -57,11 +58,14 @@ def main():
             success = ci.test()
         if opts.down == True:
             ci.down()
-        return success
+	if success is None:
+            raise Exception
+	sys.exit(0)
     except Exception as e:
         logging.error(e)
         if opts.down == True:
             ci.down() 
+	sys.exit(1)
 
 if __name__ == "__main__":
     main()

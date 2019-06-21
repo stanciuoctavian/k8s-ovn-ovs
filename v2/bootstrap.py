@@ -8,6 +8,7 @@ import subprocess
 import select
 import errno
 import json
+import sys
 
 p = configargparse.get_argument_parser()
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ def call(popenargs, stdout_log_level=logging.INFO, stderr_log_level=logging.ERRO
             if not line:
                 # Read everything
                 return True
-            logger.log(log_level, line.rstrip('\n'))
+#            logger.log(log_level, line.rstrip('\n'))
             more = select.select([source],[],[],0.1)
             if not more[0]:
                 return False # Buffer empty but not the end
@@ -226,6 +227,7 @@ def main():
         success = not int(ret)
     except:
         success = False
+	sys.exit(1)
     finally:
         create_finished(log_paths["finished"], success)
         upload_file(log_paths["finished"], log_paths["remote_finished"])

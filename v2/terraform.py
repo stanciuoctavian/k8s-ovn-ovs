@@ -221,11 +221,11 @@ class TerraformProvisioner(deployer.NoopDeployer):
 
     def up(self):
         self.logging.info("Terraform up.")
-        self._get_terraform_config()
-        self._create_terraform_vars_file()
-        terraform_output = self._deploy_cluster()
-        self._parse_terraform_output(terraform_output)
-        self._populate_hosts_file()
+#        self._get_terraform_config()
+#        self._create_terraform_vars_file()
+#        terraform_output = self._deploy_cluster()
+#        self._parse_terraform_output(terraform_output)
+#        self._populate_hosts_file()
 
     def down(self):
         # Unfortunately, terraform destroy is not working properly

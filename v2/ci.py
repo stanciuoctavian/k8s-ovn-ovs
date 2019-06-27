@@ -122,5 +122,4 @@ class CI(object):
             import time
             time.sleep(1000000)
         ret = self._runTests()
-        if ret != 0:
-            return ret
+        return ret

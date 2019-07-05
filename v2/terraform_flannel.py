@@ -105,7 +105,7 @@ class Terraform_Flannel(ci.CI):
 
     def _prepare_ansible(self):
         utils.clone_repo(self.opts.ansibleRepo, self.opts.ansibleBranch, self.default_ansible_path)
-        
+
         # Creating ansible hosts file
         linux_master_hostname = self.deployer.get_cluster_master_vm_name()
         windows_minions_hostnames = self.deployer.get_cluster_win_minion_vms_names()
@@ -132,14 +132,14 @@ class Terraform_Flannel(ci.CI):
             with open(filepath, "w") as f:
                 f.write(hosts_var_content)
                 f.write(win_hosts_extra_vars)
-    
+
         # Enable ansible log and set ssh options
         with open(self.ansible_config_file, "a") as f:
             log_file = os.path.join(self.opts.log_path, "ansible-deploy.log")
             log_config = "log_path=%s\n" % log_file
             # This probably goes better in /etc/ansible.cfg (set in dockerfile )
             ansible_config="\n\n[ssh_connection]\nssh_args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\n"
-            f.write(log_config) 
+            f.write(log_config)
             f.write(ansible_config)
 
         full_ansible_tmp_path = os.path.join(self.ansible_playbook_root, "tmp")
@@ -222,7 +222,7 @@ class Terraform_Flannel(ci.CI):
         if ret != 0:
             self.logging.error("Ansible failed to copy file to %s with error: %s" % (machine, out))
             raise Exception("Ansible failed to copy file to %s with error: %s" % (machine, out))
- 
+
     def _copyFrom(self, src, dest, machine, windows=False, root=False):
         self.logging.info("Copying file %s:%s to %s." % (machine, src, dest))
         cmd = ["ansible"]
@@ -247,7 +247,7 @@ class Terraform_Flannel(ci.CI):
         if ret != 0:
             self.logging.error("Ansible failed to fetch file from %s with error: %s" % (machine, out))
             raise Exception("Ansible failed to fetch file from %s with error: %s" % (machine, out))
-   
+
     def _runRemoteCmd(self, command, machine, windows=False, root=False):
         self.logging.info("Running cmd on remote machine %s." % (machine))
         cmd=["ansible"]
@@ -321,10 +321,24 @@ class Terraform_Flannel(ci.CI):
             self._deploy_ansible()
         except Exception as e:
             raise e
-    
+
     def down(self):
         self.logging.info("Destroying cluster.")
         try:
             self.deployer.down()
         except Exception as e:
             raise e
+
+    def collectWindowsLogs(self):
+        self.logging.info("Collecting logs.")
+        collect_logs_script = os.path.join(os.getcwd(), "collect-logs.ps1")
+        try:
+            for vm_name in self.deployer.get_cluster_win_minion_vms_names():
+                logs_vm_path = os.path.join(self.opts.log_path, "%s.zip" % vm_name)
+                self.logging.info("Copying collect-logs script to node %s" % vm_name)
+                self._copyTo(collect_logs_script, "c:\\", vm_name, windows=True)
+                self._runRemoteCmd(("c:\\collect-logs.ps1 -ArchivePath C:\\k\\logs.zip"), vm_name, windows=True)
+                self._copyFrom("C:\\k\\logs.zip", logs_vm_path, vm_name, windows=True)
+        except Exception as e:
+            self.logging.info("Collecting logs failed.")
+            self.logging.error(e)

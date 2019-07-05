@@ -56,16 +56,16 @@ def main():
             ci.up()
         if opts.test == True:
             success = ci.test()
-        if opts.down == True:
-            ci.down()
         if success != 0:
             raise Exception
         sys.exit(0)
     except Exception as e:
         logging.error(e)
+        sys.exit(1)
+    finally:
+        ci.collectWindowsLogs()
         if opts.down == True:
             ci.down()
-        sys.exit(1)
 
 if __name__ == "__main__":
     main()

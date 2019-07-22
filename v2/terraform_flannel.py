@@ -184,10 +184,11 @@ class Terraform_Flannel(ci.CI):
         self.logging.info("Succesfully deployed ansible-playbook.")
 
 
-    def _waitForConnection(self, machine, windows):
-        self.logging.info("Waiting for connection to machine %s." % machine)
+    def _waitForConnection(self, machines, windows):
+        self.logging.info("Waiting for connection to %s." % machines)
         cmd = ["ansible"]
-        cmd.append(machine)
+        cmd.append("'%s'" % " ".join(machines))
+
         if not windows:
             cmd.append("--key-file=%s" % self.opts.ssh_private_key_path)
         cmd.append("-m")
@@ -198,30 +199,31 @@ class Terraform_Flannel(ci.CI):
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
         return ret, out
 
-    def _copyTo(self, src, dest, machine, windows=False, root=False):
-        self.logging.info("Copying file %s to %s:%s." % (src, machine, dest))
+    def _copyTo(self, src, dest, machines, windows=False, root=False):
+        self.logging.info("Copying file %s to %s on %s." % (src, dest, machines))
         cmd = ["ansible"]
         if root:
             cmd.append("--become")
         if not windows:
             cmd.append("--key-file=%s" % self.opts.ssh_private_key_path)
-        cmd.append(machine)
+
+        cmd.append("'%s'" % " ".join(machines))
         cmd.append("-m")
         module = "win_copy" if windows else "copy"
         cmd.append(module)
         cmd.append("-a")
         cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
 
-        ret, _ = self._waitForConnection(machine, windows=windows)
+        ret, out = self._waitForConnection(machines, windows=windows)
         if ret != 0:
-            self.logging.error("No connection to machine: %s", machine)
-            raise Exception("No connection to machine: %s", machine)
+            self.logging.error("No connection to machines. Error: %s" % out)
+            raise Exception("No connection to machines. Error: %s" % out)
 
         # Ansible logs everything to stdout
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
         if ret != 0:
-            self.logging.error("Ansible failed to copy file to %s with error: %s" % (machine, out))
-            raise Exception("Ansible failed to copy file to %s with error: %s" % (machine, out))
+            self.logging.error("Ansible failed to copy file %s with error: %s" % (src, out))
+            raise Exception("Ansible failed to copy file %s with error: %s" % (src, out))
 
     def _copyFrom(self, src, dest, machine, windows=False, root=False):
         self.logging.info("Copying file %s:%s to %s." % (machine, src, dest))
@@ -248,8 +250,8 @@ class Terraform_Flannel(ci.CI):
             self.logging.error("Ansible failed to fetch file from %s with error: %s" % (machine, out))
             raise Exception("Ansible failed to fetch file from %s with error: %s" % (machine, out))
 
-    def _runRemoteCmd(self, command, machine, windows=False, root=False):
-        self.logging.info("Running cmd on remote machine %s." % (machine))
+    def _runRemoteCmd(self, command, machines, windows=False, root=False):
+        self.logging.info("Running cmd %s on remote machines %s." % (command, machines))
         cmd=["ansible"]
         if root:
             cmd.append("--become")
@@ -258,30 +260,31 @@ class Terraform_Flannel(ci.CI):
         else:
             task = "shell"
             cmd.append("--key-file=%s" % self.opts.ssh_private_key_path)
-        cmd.append(machine)
+
+
+        cmd.append("'%s'" % " ".join(machines))
         cmd.append("-m")
         cmd.append(task)
         cmd.append("-a")
         cmd.append("'%s'" % command)
 
-        ret, _ = self._waitForConnection(machine, windows=windows)
+        ret, out = self._waitForConnection(machines, windows=windows)
         if ret != 0:
-            self.logging.error("No connection to machine: %s", machine)
-            raise Exception("No connection to machine: %s", machine)
+            self.logging.error("No connection to machines. Error: %s" % out)
+            raise Exception("No connection to machines. Error: %s" % out)
 
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
-
         if ret != 0:
-            self.logging.error("Ansible failed to run command %s on machine %s with error: %s" % (cmd, machine, out))
-            raise Exception("Ansible failed to run command %s on machine %s with error: %s" % (cmd, machine, out))
+            self.logging.error("Ansible failed to copy file %s with error: %s" % (src, out))
+            raise Exception("Ansible failed to copy file %s with error: %s" % (src, out))
 
     def _prepullImages(self, runtime):
         # TO DO: This path should be passed as param
-        prepull_script="/tmp/k8s-ovn-ovs/v2/prepull.ps1"
-        for vm_name in self.deployer.get_cluster_win_minion_vms_names():
-            self.logging.info("Copying prepull script to node %s" % vm_name)
-            self._copyTo(prepull_script, "c:\\", vm_name, windows=True)
-            self._runRemoteCmd(("c:\\prepull.ps1 -runtime %s" % runtime), vm_name, windows=True)
+        prepull_script=os.path.join(os.getcwd(), "prepull.ps1")
+        self.logging.info("Copying prepull script to all windows nodes.")
+        vms = self.deployer.get_cluster_win_minion_vms_names()
+        self._copyTo(prepull_script, "c:\\", vms, windows=True)
+        self._runRemoteCmd(("c:\\prepull.ps1 -runtime %s" % runtime), vms, windows=True)
 
     def _prepareTestEnv(self):
         # For Ansible based CIs: copy config file from .kube folder of the master node
@@ -333,11 +336,12 @@ class Terraform_Flannel(ci.CI):
         self.logging.info("Collecting logs.")
         collect_logs_script = os.path.join(os.getcwd(), "collect-logs.ps1")
         try:
-            for vm_name in self.deployer.get_cluster_win_minion_vms_names():
+            self.logging.info("Copying collect-logs script to windows nodes.")
+            vms = self.deployer.get_cluster_win_minion_vms_names()
+            self._copyTo(collect_logs_script, "c:\\", vms, windows=True)
+            self._runRemoteCmd(("c:\\collect-logs.ps1 -ArchivePath C:\\k\\logs.zip"), vms, windows=True)
+            for vm_name in vms:
                 logs_vm_path = os.path.join(self.opts.log_path, "%s.zip" % vm_name)
-                self.logging.info("Copying collect-logs script to node %s" % vm_name)
-                self._copyTo(collect_logs_script, "c:\\", vm_name, windows=True)
-                self._runRemoteCmd(("c:\\collect-logs.ps1 -ArchivePath C:\\k\\logs.zip"), vm_name, windows=True)
                 self._copyFrom("C:\\k\\logs.zip", logs_vm_path, vm_name, windows=True)
         except Exception as e:
             self.logging.info("Collecting logs failed.")

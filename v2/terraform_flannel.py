@@ -239,7 +239,7 @@ class Terraform_Flannel(ci.CI):
         cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
 
         # TO DO: (atuvenie) This could really be a decorator
-        ret, _ = self._waitForConnection(machine, windows=windows)
+        ret, _ = self._waitForConnection([machine], windows=windows)
         if ret != 0:
             self.logging.error("No connection to machine: %s", machine)
             raise Exception("No connection to machine: %s", machine)

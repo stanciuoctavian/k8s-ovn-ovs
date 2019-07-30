@@ -212,7 +212,7 @@ class Terraform_Flannel(ci.CI):
         module = "win_copy" if windows else "copy"
         cmd.append(module)
         cmd.append("-a")
-        cmd.append("'src=%(src)s dest=%(dest)s flat=yes'" % {"src": src, "dest": dest})
+        cmd.append("'src=%(src)s dest=%(dest)s'" % {"src": src, "dest": dest})
 
         ret, out = self._waitForConnection(machines, windows=windows)
         if ret != 0:
@@ -261,7 +261,6 @@ class Terraform_Flannel(ci.CI):
             task = "shell"
             cmd.append("--key-file=%s" % self.opts.ssh_private_key_path)
 
-
         cmd.append("'%s'" % " ".join(machines))
         cmd.append("-m")
         cmd.append(task)
@@ -275,8 +274,8 @@ class Terraform_Flannel(ci.CI):
 
         out, _, ret = utils.run_cmd(cmd, stdout=True, cwd=self.ansible_playbook_root, shell=True)
         if ret != 0:
-            self.logging.error("Ansible failed to copy file %s with error: %s" % (src, out))
-            raise Exception("Ansible failed to copy file %s with error: %s" % (src, out))
+            self.logging.error("Ansible failed to run command %s on machine %s with error: %s" % (cmd, machines, out))
+            raise Exception("Ansible failed to run command %s on machine %s with error: %s" % (cmd, machines, out))
 
     def _prepullImages(self, runtime):
         # TO DO: This path should be passed as param
@@ -321,6 +320,9 @@ class Terraform_Flannel(ci.CI):
         try:
             self.deployer.up()
             self._prepare_ansible()
+            if self.opts.hold_ansible == True:
+                import time
+                time.sleep(1000000)
             self._deploy_ansible()
         except Exception as e:
             raise e
@@ -333,7 +335,7 @@ class Terraform_Flannel(ci.CI):
             raise e
 
     def collectWindowsLogs(self):
-        self.logging.info("Collecting logs.")
+        self.logging.info("Collecting Windows logs.")
         collect_logs_script = os.path.join(os.getcwd(), "collect-logs.ps1")
         try:
             self.logging.info("Copying collect-logs script to windows nodes.")
@@ -344,5 +346,20 @@ class Terraform_Flannel(ci.CI):
                 logs_vm_path = os.path.join(self.opts.log_path, "%s.zip" % vm_name)
                 self._copyFrom("C:\\k\\logs.zip", logs_vm_path, vm_name, windows=True)
         except Exception as e:
-            self.logging.info("Collecting logs failed.")
+            self.logging.info("Collecting logs on windows nodes failed.")
+            self.logging.error(e)
+
+    def collectLinuxLogs(self):
+        self.logging.info("Collecting Linux logs.")
+        collect_logs_script = os.path.join(os.getcwd(), "collect-logs.sh")
+        linux_master = self.deployer.get_cluster_master_vm_name()
+        logs_vm_path = os.path.join(self.opts.log_path, "linux-master-logs.tar.gz")
+        try:
+            self.logging.info("Copying collect-logs script to linux master node.")
+            self._copyTo(collect_logs_script, "/home/ubuntu", [linux_master], root=True)
+            self._runRemoteCmd(("chmod +x /home/ubuntu/collect-logs.sh"), [linux_master], root=True)
+            self._runRemoteCmd(("/home/ubuntu/./collect-logs.sh"), [linux_master], root=True)
+            self._copyFrom("/home/ubuntu/k8s-logs.tar.gz", logs_vm_path, linux_master, root=True)
+        except Exception as e:
+            self.logging.info("Collecting logs on master node failed.")
             self.logging.error(e)

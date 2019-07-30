@@ -32,7 +32,7 @@ def parse_args():
     p.add('--k8s-branch', default="master")
     p.add('--hold', type=str2bool, default=False, help='Useful for debugging while running in containerd. \
                                                         Sleeps the process after setting the env for testing so user can manually exec from container.')
-
+    p.add('--hold-ansible', type=str2bool, default=False, help='Sleeps the process before ansible deployment')
     opts = p.parse_known_args()
 
     return opts
@@ -64,6 +64,7 @@ def main():
         sys.exit(1)
     finally:
         ci.collectWindowsLogs()
+        ci.collectLinuxLogs()
         if opts.down == True:
             ci.down()
 

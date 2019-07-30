@@ -64,6 +64,7 @@ def main():
         sys.exit(1)
     finally:
         ci.collectWindowsLogs()
+        ci.collectLinuxLogs()
         if opts.down == True:
             ci.down()
 

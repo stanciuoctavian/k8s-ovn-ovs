@@ -13,6 +13,8 @@ p.add("--parallel-test-nodes", default=1)
 p.add("--test-dry-run", default="False")
 p.add("--test-focus-regex", default="\\[Conformance\\]|\\[NodeConformance\\]|\\[sig-windows\\]")
 p.add("--test-skip-regex", default="\\[LinuxOnly\\]")
+p.add("--test-flake-attempts", default="1")
+
 
 class CI(object):
 
@@ -107,10 +109,12 @@ class CI(object):
         cmd.append("--provider=skeleton")
         cmd.append("--test")
         cmd.append("--dump=%s" % self.opts.log_path)
-        cmd.append('--test_args=--ginkgo.flakeAttempts=1 --num-nodes=2 --ginkgo.noColor --ginkgo.dryRun=%(dryRun)s --node-os-distro=windows --ginkgo.focus=%(focus)s --ginkgo.skip=%(skip)s' % {
+        cmd.append('--test_args=--ginkgo.flakeAttempts=%(flakeAttempts)s --num-nodes=%(numNodes)s --ginkgo.noColor --ginkgo.dryRun=%(dryRun)s --node-os-distro=windows --ginkgo.focus=%(focus)s --ginkgo.skip=%(skip)s' % {
                                                                                                 "dryRun": self.opts.test_dry_run,
                                                                                                 "focus": self.opts.test_focus_regex,
-                                                                                                "skip": self.opts.test_skip_regex
+                                                                                                "skip": self.opts.test_skip_regex,
+                                                                                                "flakeAttempts": self.opts.test_flake_attempts,
+                                                                                                "numNodes": self.opts.win_minion_count
                                                                                              })
         return subprocess.call(cmd, cwd=utils.get_k8s_folder())
 

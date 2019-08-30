@@ -67,20 +67,20 @@ def build_k8s_binaries(k8s_path=None):
     logging.info("Building K8s Binaries:")
     logging.info("Build k8s linux binaries.")
     cmd = ["make", 'WHAT="cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet cmd/kubectl cmd/kube-scheduler cmd/kube-proxy"']
-    
+
     _, err, ret = run_cmd(cmd, stderr=True, cwd=k8s_path, shell=True)
 
     if ret != 0:
         logging.error("Failed to build k8s linux binaries with error: %s" % err)
         raise Exception("Failed to build k8s linux binaries with error: %s" % err)
-    
+
     cmd = ["make", 'WHAT="cmd/kubelet cmd/kubectl cmd/kube-proxy"', "KUBE_BUILD_PLATFORMS=windows/amd64"]
 
     _, err, ret = run_cmd(cmd, stderr=True, cwd=k8s_path, shell=True)
     if ret != 0:
         logging.error("Failed to build k8s windows binaries with error: %s" % err)
         raise Exception("Failed to build k8s windows binaries with error: %s" % err)
-    
+
     logging.info("Succesfully built k8s binaries.")
 
 def get_k8s(repo, branch):
@@ -94,6 +94,7 @@ def download_file(url, dst):
 
     if ret != 0:
         logging.error("Failed to download file: %s" % url)
+        raise Exception("Failed to download file %s with error: %s" % (url, err))
 
 def run_ssh_cmd(cmd, user, host,):
     cmd = ["ssh","-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"]
